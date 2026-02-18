@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Minimize a Debian or Ubuntu cloud image to a provider-agnostic baseline. Detects and removes AWS, GCP, Azure,
+# DigitalOcean, Hetzner, Linode, Vultr, Oracle Cloud (OCI), Scaleway, OVHcloud, UpCloud, Cherry Servers, Civo,
+# Alibaba Cloud, Tencent Cloud, Exoscale, Ionos, Equinix Metal, and Gcore specific packages, repos, configs, and
+# services, then strips everything not in the whitelist.
+
+test "${EUID}" -eq 0    || { echo "Error: must run as root"                          >&2; exit 1; }
+test -f /etc/os-release || { echo "Error: Debian-based Linux distribution required." >&2; exit 1; }
+
+_allowed_packages=(
+    # Kernel & boot (Debian)
+    linux-image-amd64 linux-image-arm64 grub-pc grub-efi-amd64 grub-efi-arm64
+    # Kernel & boot (Ubuntu)
+    linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
+    # Init, system, package management
+    systemd systemd-sysv dbus udev apt dpkg
+    # Base system
+    base-files base-passwd bash coreutils debianutils diffutils findutils
+    grep gzip hostname login passwd sed tar util-linux
+    # Networking & DHCP
+    iproute2 iputils-ping netbase ca-certificates curl dhcpcd-base dhcpcd5
+    # SSH & cloud-init
+    openssh-server openssh-client cloud-init
+    # Basics & distro-specific
+    sudo procps less netplan.io systemd-resolved
+)
+
+# build the list of packages (and dependencies to preserve); nuke everything else
+_preserve_packages=()
+for pkg in "${_allowed_packages[@]}"; do
+    if dpkg-query -W -f='${Status}' "${pkg}" 2>/dev/null | grep -q "install ok installed"; then
+        _preserve_packages+=("${pkg}")
+    fi
+done
+apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1 # mark all "auto" (can be removed)
+apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1   # mark each _preserve_package as manual (to be preserved)
+DEBIAN_FRONTEND=noninteractive apt-get -y autoremove --purge  # nuke everything that isn't marked as manual
+apt-get -y clean
+
+rm -rf \
+    `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
+    `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    `# apt cache      ` /var/lib/apt/lists/* \
+    `# SSH host keys  ` /etc/ssh/ssh_host_* \
+    `# authorized_keys` /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys \
+    `# shell history  ` /root/.bash_history /home/*/.bash_history \
+    `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
+    `# Providers:     ` \
+    `# AWS            ` /opt/aws /etc/amazon /var/log/amazon \
+    `# GCP            ` /etc/default/instance_configs.cfg /etc/default/instance_configs.cfg.distro /etc/default/instance_configs.cfg.template /var/log/google-guest-agent \
+    `# Azure          ` /var/lib/waagent /var/log/waagent.log /etc/waagent.conf \
+    `# DigitalOcean   ` /opt/digitalocean /var/log/droplet-agent /etc/do-agent \
+    `# Hetzner        ` /etc/hc-utils /var/log/hc-utils \
+    `# Linode         ` /opt/linode /etc/linode /var/log/linode \
+    `# Vultr          ` /opt/vultr /etc/vultr /var/log/vultr \
+    `# Oracle Cloud   ` /opt/oracle-cloud-agent /etc/oracle-cloud-agent /var/log/oracle-cloud-agent /usr/libexec/oracle-cloud-agent \
+    `# Scaleway       ` /etc/scaleway /opt/scaleway /var/log/scaleway /usr/local/sbin/scw-generate-ssh-keys /usr/local/sbin/scw-fetch-ssh-keys /usr/local/sbin/scw-signal-booted /usr/local/sbin/scw-generate-net-config \
+    `# OVHcloud       ` /opt/ovh /etc/ovh /var/log/ovh-rtm /usr/bin/noderig /usr/bin/beamium /etc/beamium \
+    `# UpCloud        ` /etc/upcloud /opt/upcloud /var/log/upcloud \
+    `# Cherry Servers ` /etc/cherry /opt/cherry /var/log/cherry-agent \
+    `# Civo           ` /etc/civo /opt/civo /var/log/civo \
+    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun-service /usr/sbin/aliyun_assist /etc/aliyun-service /opt/Chinese /usr/local/cloudmonitor /var/log/aliyun \
+    `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive /var/log/tencent \
+    `# Exoscale       ` /etc/exoscale /opt/exoscale /var/log/exoscale \
+    `# Ionos          ` /etc/ionos /opt/ionos /var/log/ionos \
+    `# Equinix Metal  ` /opt/packet /etc/packet /var/log/packet \
+    `# Gcore          ` /etc/gcore /opt/gcore /var/log/gcore \
+    `# Snap           ` /snap /var/snap /var/lib/snapd
+
+cat > /etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost ip6-localhost ip6-loopback
+EOF
+
+# Regenerate machine-id and SSH host keys
+systemd-machine-id-setup
+ssh-keygen -A
+
+# Detect distro and write clean apt sources (deb822 format)
+. /etc/os-release
+if [[ "${ID}" == "debian" ]]; then
+    _repo_uri="http://deb.debian.org/debian"
+    _security_uri="http://deb.debian.org/debian-security"
+    _components="main"
+else
+    _repo_uri="http://archive.ubuntu.com/ubuntu"
+    _security_uri="http://security.ubuntu.com/ubuntu"
+    _components="main restricted universe"
+fi
+cat > /etc/apt/sources.list.d/${ID}.sources <<EOF
+Types: deb
+URIs: ${_repo_uri}
+Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
+Components: ${_components}
+
+Types: deb
+URIs: ${_security_uri}
+Suites: ${VERSION_CODENAME}-security
+Components: ${_components}
+EOF
