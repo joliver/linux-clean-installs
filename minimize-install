@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Minimize a Debian or Ubuntu cloud image to a provider-agnostic baseline. Detects and removes AWS, GCP, Azure,
-# DigitalOcean, Hetzner, Linode, Vultr, Oracle Cloud (OCI), Scaleway, OVHcloud, UpCloud, Cherry Servers, Civo,
-# Alibaba Cloud, Tencent Cloud, Exoscale, Ionos, Equinix Metal, and Gcore specific packages, repos, configs, and
-# services, then strips everything not in the whitelist.
+# Minimize a Debian or Ubuntu cloud image to a provider-agnostic baseline. Removes AWS, Azure, GCP, IBM Cloud,
+# Oracle Cloud, Rackspace, DigitalOcean, Linode, Vultr, Equinix Metal, OVHcloud, Hetzner, Ionos, Scaleway,
+# Yandex Cloud, UpCloud, Exoscale, Leaseweb, Selectel, Gcore, Civo, Cherry Servers, Alibaba Cloud, Huawei Cloud,
+# Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages, repos, configs, and services, then strips
+# everything not in the whitelist.
 
 test "${EUID}" -eq 0    || { echo "Error: must run as root"                          >&2; exit 1; }
 test -f /etc/os-release || { echo "Error: Debian-based Linux distribution required." >&2; exit 1; }
@@ -46,28 +47,36 @@ rm -rf \
     `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# authorized_keys` /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys \
     `# shell history  ` /root/.bash_history /home/*/.bash_history \
+    `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# Providers:     ` \
-    `# AWS            ` /opt/aws /etc/amazon /var/log/amazon \
-    `# GCP            ` /etc/default/instance_configs.cfg /etc/default/instance_configs.cfg.distro /etc/default/instance_configs.cfg.template /var/log/google-guest-agent \
-    `# Azure          ` /var/lib/waagent /var/log/waagent.log /etc/waagent.conf \
-    `# DigitalOcean   ` /opt/digitalocean /var/log/droplet-agent /etc/do-agent \
-    `# Hetzner        ` /etc/hc-utils /var/log/hc-utils \
-    `# Linode         ` /opt/linode /etc/linode /var/log/linode \
-    `# Vultr          ` /opt/vultr /etc/vultr /var/log/vultr \
-    `# Oracle Cloud   ` /opt/oracle-cloud-agent /etc/oracle-cloud-agent /var/log/oracle-cloud-agent /usr/libexec/oracle-cloud-agent \
-    `# Scaleway       ` /etc/scaleway /opt/scaleway /var/log/scaleway /usr/local/sbin/scw-generate-ssh-keys /usr/local/sbin/scw-fetch-ssh-keys /usr/local/sbin/scw-signal-booted /usr/local/sbin/scw-generate-net-config \
-    `# OVHcloud       ` /opt/ovh /etc/ovh /var/log/ovh-rtm /usr/bin/noderig /usr/bin/beamium /etc/beamium \
-    `# UpCloud        ` /etc/upcloud /opt/upcloud /var/log/upcloud \
-    `# Cherry Servers ` /etc/cherry /opt/cherry /var/log/cherry-agent \
-    `# Civo           ` /etc/civo /opt/civo /var/log/civo \
-    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun-service /usr/sbin/aliyun_assist /etc/aliyun-service /opt/Chinese /usr/local/cloudmonitor /var/log/aliyun \
-    `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive /var/log/tencent \
-    `# Exoscale       ` /etc/exoscale /opt/exoscale /var/log/exoscale \
-    `# Ionos          ` /etc/ionos /opt/ionos /var/log/ionos \
-    `# Equinix Metal  ` /opt/packet /etc/packet /var/log/packet \
-    `# Gcore          ` /etc/gcore /opt/gcore /var/log/gcore \
-    `# Snap           ` /snap /var/snap /var/lib/snapd
+    `# AWS            ` /opt/aws /etc/amazon \
+    `# Azure          ` /var/lib/waagent /etc/waagent.conf \
+    `# GCP            ` /etc/default/instance_configs.cfg* \
+    `# IBM Cloud      ` /opt/IBM /opt/bnpp \
+    `# Oracle Cloud   ` /opt/oracle-cloud* /etc/oracle-cloud* /usr/libexec/oracle-cloud* \
+    `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
+    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
+    `# Linode         ` /opt/linode /etc/linode \
+    `# Vultr          ` /opt/vultr /etc/vultr \
+    `# Equinix Metal  ` /opt/packet /etc/packet \
+    `# OVHcloud       ` /opt/ovh /etc/ovh /usr/bin/noderig /usr/bin/beamium /etc/beamium \
+    `# Hetzner        ` /etc/hc-utils \
+    `# Ionos          ` /etc/ionos /opt/ionos \
+    `# Scaleway       ` /etc/scaleway /opt/scaleway /usr/local/sbin/scw-* \
+    `# Yandex Cloud   ` /opt/yandex \
+    `# UpCloud        ` /etc/upcloud /opt/upcloud \
+    `# Exoscale       ` /etc/exoscale /opt/exoscale \
+    `# Leaseweb       ` /opt/leaseweb \
+    `# Selectel       ` /opt/selectel \
+    `# Gcore          ` /etc/gcore /opt/gcore \
+    `# Civo           ` /etc/civo /opt/civo \
+    `# Cherry Servers ` /etc/cherry /opt/cherry \
+    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/cloudmonitor \
+    `# Huawei Cloud   ` /usr/local/hostguard /opt/huawei \
+    `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive \
+    `# Baidu Cloud    ` /usr/local/bce \
+    `# Naver Cloud    ` /opt/ncloud
 
 cat > /etc/hosts <<EOF
 127.0.0.1   localhost
