@@ -18,8 +18,7 @@ _allowed_packages=(
     # Init, system, package management
     systemd systemd-sysv dbus udev apt dpkg
     # Base system
-    base-files base-passwd bash coreutils debianutils diffutils findutils
-    grep gzip login passwd sed tar util-linux
+    base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip login passwd sed tar util-linux
     # Networking & DHCP
     iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5
     # SSH & cloud-init
