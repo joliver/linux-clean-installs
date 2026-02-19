@@ -11,7 +11,7 @@ test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 _allowed_packages=(
     # Kernel & boot (Debian)
-    linux-image-amd64 linux-image-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
+    linux-image-amd64 linux-image-cloud-amd64 linux-image-arm64 linux-image-cloud-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
     amd64-microcode intel-microcode
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     # Kernel & boot (Ubuntu)
@@ -19,9 +19,9 @@ _allowed_packages=(
     # Init, system, package management
     systemd systemd-sysv dbus udev apt dpkg
     # Base system
-    base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip login passwd sed tar util-linux
+    base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip zstd login passwd sed tar util-linux
     # Networking & DHCP
-    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ifupdown
+    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ethtool ifupdown
     # SSH & cloud-init
     openssh-server openssh-client cloud-init
     # Basics & distro-specific
@@ -35,19 +35,26 @@ for pkg in "${_allowed_packages[@]}"; do
         _preserve_packages+=("${pkg}")
     fi
 done
+
+apt-get update
+rm -f /etc/apt/apt.conf.d/*
+# Remove APT's auto-generated kernel protection so autoremove relies solely on our whitelist
+apt-get install --reinstall -o Dpkg::Options::="--force-confmiss" apt
+
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" autoremove --purge
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" purge cron 2> /dev/null || true
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false autoremove --purge
 apt-get -y clean
+
+# another idea: get rid of files that don't belong to default packages
+# apt has a list of files
+# we can identify all files that shouldn't be there after we remove the appropriate packages
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
     `# apt cache      ` /var/lib/apt/lists/* \
-    `# SSH host keys  ` /etc/ssh/ssh_host_* \
-    `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
@@ -82,16 +89,18 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/ncloud /opt/nbp
 
-# Regenerate machine-id and SSH host keys
+# Regenerate machine-id
 systemd-machine-id-setup
-ssh-keygen -A
+
+# # Regenerate SSH host key
+# ssh-keygen -A # `# SSH host keys  ` /etc/ssh/ssh_host_* \
 
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 echo "UTC" > /etc/timezone
 
 # Lock root account (no password, no direct login)
-# passwd -l root
+passwd -l root
 
 cat > /etc/hosts <<EOF
 127.0.0.1   localhost
@@ -126,9 +135,9 @@ Components: ${_components}
 Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 
-apt-get update
+apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" dist-upgrade
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" autoremove --purge
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false autoremove --purge
 apt-get -y clean
 
 mkdir -p /root/.ssh/
@@ -139,3 +148,5 @@ chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
 # hash every file on the server
 # find / -path /run -prune -o -path /proc -prune -o -path /sys -prune -o -type f -exec sha256sum {} + > /root/debian-PROVIDER_HERE.txt
+
+reboot

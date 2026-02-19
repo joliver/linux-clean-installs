@@ -18,7 +18,7 @@ _allowed_packages=(
     # Base system
     basesystem bash coreutils diffutils findutils grep gzip shadow-utils sed tar util-linux
     # Networking & DHCP
-    iproute ca-certificates curl NetworkManager dhcp-client
+    iproute ca-certificates curl ethtool NetworkManager dhcp-client
     # SSH & cloud-init
     openssh-server openssh-clients cloud-init
     # Basics
@@ -44,7 +44,7 @@ else
 fi
 dnf -y mark "${_mark_auto}" '*' > /dev/null 2>&1
 dnf -y mark "${_mark_manual}" "${_preserve_packages[@]}" > /dev/null 2>&1
-dnf -y autoremove
+dnf -y --setopt=install_weak_deps=False autoremove
 dnf -y remove cronie 2> /dev/null || true
 dnf -y clean all
 
@@ -52,7 +52,6 @@ rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
     `# dnf repos      ` /etc/yum.repos.d/* \
     `# dnf cache      ` /var/cache/dnf/* \
-    `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
     `# motd/banners   ` /etc/motd /etc/motd.d/* /run/motd.dynamic \
@@ -88,9 +87,9 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/ncloud /opt/nbp
 
-# Regenerate machine-id and SSH host keys
+# Regenerate machine-id
 systemd-machine-id-setup
-ssh-keygen -A
+# ssh-keygen -A # `# SSH host keys  ` /etc/ssh/ssh_host_* \
 
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
@@ -165,7 +164,7 @@ gpgkey=${_gpgkey}
 EOF
 
 dnf -y distro-sync
-dnf -y autoremove
+dnf -y --setopt=install_weak_deps=False autoremove
 dnf -y clean all
 
 mkdir -p /root/.ssh/

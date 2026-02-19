@@ -18,7 +18,7 @@ _allowed_packages=(
     # Base system
     base bash coreutils diffutils findutils grep gzip shadow sed tar util-linux
     # Networking & DHCP
-    iproute2 ca-certificates curl dhcpcd
+    iproute2 ca-certificates curl ethtool dhcpcd
     # SSH & cloud-init
     openssh cloud-init
     # Basics
@@ -42,7 +42,6 @@ pacman -Scc --noconfirm
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
     `# pacman cache   ` /var/cache/pacman/pkg/* \
-    `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
     `# motd/banners   ` /etc/motd /etc/motd.d/* /run/motd.dynamic \
@@ -78,9 +77,9 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/ncloud /opt/nbp
 
-# Regenerate machine-id and SSH host keys
+# Regenerate machine-id
 systemd-machine-id-setup
-ssh-keygen -A
+# ssh-keygen -A     # `# SSH host keys  ` /etc/ssh/ssh_host_* \
 
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
