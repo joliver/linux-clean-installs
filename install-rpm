@@ -44,8 +44,8 @@ fi
 dnf -y mark "${_mark_auto}" '*' > /dev/null 2>&1
 dnf -y mark "${_mark_manual}" "${_preserve_packages[@]}" > /dev/null 2>&1
 dnf -y autoremove
-dnf -y clean all
 dnf -y remove cronie 2> /dev/null || true
+dnf -y clean all
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
