@@ -19,13 +19,13 @@ _allowed_packages=(
     systemd systemd-sysv dbus udev apt dpkg
     # Base system
     base-files base-passwd bash coreutils debianutils diffutils findutils
-    grep gzip hostname login passwd sed tar util-linux
+    grep gzip login passwd sed tar util-linux
     # Networking & DHCP
-    iproute2 iputils-ping netbase ca-certificates curl dhcpcd-base dhcpcd5
+    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5
     # SSH & cloud-init
     openssh-server openssh-client cloud-init
     # Basics & distro-specific
-    sudo procps less netplan.io systemd-resolved
+    sudo netplan.io systemd-resolved
 )
 
 # build the list of packages (and dependencies to preserve); nuke everything else
