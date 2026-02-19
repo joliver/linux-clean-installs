@@ -10,6 +10,36 @@ set -euo pipefail
 test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 
+# Detect distro and write clean apt sources (deb822 format)
+. /etc/os-release
+rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*} \
+       /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
+case "${ID}" in
+    debian)
+        _repo_uri="http://deb.debian.org/debian"
+        _security_uri="http://deb.debian.org/debian-security"
+        _components="main"
+        ;;
+    ubuntu)
+        _repo_uri="http://archive.ubuntu.com/ubuntu"
+        _security_uri="http://security.ubuntu.com/ubuntu"
+        _components="main restricted universe"
+        ;;
+esac
+cat > "/etc/apt/sources.list.d/${ID}.sources" <<EOF
+Types: deb
+URIs: ${_repo_uri}
+Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
+Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
+
+Types: deb
+URIs: ${_security_uri}
+Suites: ${VERSION_CODENAME}-security
+Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
+EOF
+
 
 # Lock root account (no password, no direct login)
 passwd -l root
@@ -38,7 +68,6 @@ cat > /etc/hosts <<EOF
 127.0.0.1   localhost
 ::1         localhost ip6-localhost ip6-loopback
 EOF
-
 
 
 # TODO: _required_packages; merged with _allowed. Required MUST be installed whereas allowed CAN be installed
@@ -81,15 +110,14 @@ dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | DEBI
 rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
 DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
+
 # Remove stale Python bytecode
 find /usr/lib /var -name '*.pyc' -delete
 # Cleanup unused files, files that can be regenerated, or provider-specific files
 rm -rf \
     `# identity       ` /etc/{hostname,adjtime} \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
-    `# apt sources    ` /etc/apt/{sources.list,sources.list~,sources.list.d/*} \
-    `# apt custom rs  ` /etc/crypttab \
-    `# apt cache      ` /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock} \
+    `# crypt tab      ` /etc/crypttab \
     `# users          ` /home/*/{.ssh/authorized_keys,.bash_history} \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
@@ -130,36 +158,6 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/{ncloud,nbp}
 
-
-
-
-# Detect distro and write clean apt sources (deb822 format)
-. /etc/os-release
-case "${ID}" in
-    debian)
-        _repo_uri="http://deb.debian.org/debian"
-        _security_uri="http://deb.debian.org/debian-security"
-        _components="main"
-        ;;
-    ubuntu)
-        _repo_uri="http://archive.ubuntu.com/ubuntu"
-        _security_uri="http://security.ubuntu.com/ubuntu"
-        _components="main restricted universe"
-        ;;
-esac
-cat > "/etc/apt/sources.list.d/${ID}.sources" <<EOF
-Types: deb
-URIs: ${_repo_uri}
-Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
-Components: ${_components}
-Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
-
-Types: deb
-URIs: ${_security_uri}
-Suites: ${VERSION_CODENAME}-security
-Components: ${_components}
-Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
-EOF
 
 
 
