@@ -76,7 +76,7 @@ rm -rf \
 
 # Regenerate machine-id and SSH host keys
 systemd-machine-id-setup
-# ssh-keygen -A
+ssh-keygen -A
 
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
