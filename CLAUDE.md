@@ -16,8 +16,8 @@ Bash scripts that strip cloud images down to a provider-agnostic baseline. They 
 
 1. Defines a whitelist of allowed packages (`_allowed_packages`)
 2. Marks all installed packages as auto-removable, then marks whitelisted ones as manual
-3. Removes everything not whitelisted (`apt-get autoremove --purge`, `dnf autoremove`, or `pacman -Rns`)
-4. Deletes provider-specific files, caches, logs, identity files, and all of `/root`
+3. Removes everything not whitelisted (`apt-get autoremove --purge`, `dnf autoremove`, or `pacman -Rns`) and explicitly removes cron
+4. Deletes provider-specific files, caches, logs, motd/banners, identity files, and all of `/root`
 5. Regenerates machine-id and SSH host keys
 6. Sets timezone to UTC and locks the root account
 7. Writes `/etc/hosts`
