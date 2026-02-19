@@ -36,16 +36,13 @@ for pkg in "${_allowed_packages[@]}"; do
     fi
 done
 
-apt-get update
-rm -f /etc/apt/apt.conf.d/*
-# Remove APT's auto-generated kernel protection so autoremove relies solely on our whitelist
-apt-get install --reinstall -o Dpkg::Options::="--force-confmiss" apt
+# APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
+{ dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false autoremove --purge
-apt-get -y clean
 
 # another idea: get rid of files that don't belong to default packages
 # apt has a list of files
