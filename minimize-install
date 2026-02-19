@@ -123,3 +123,9 @@ apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" dist-upgrade
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" autoremove --purge
 apt-get -y clean
+
+mkdir -p /root/.ssh/
+cat > /root/.ssh/authorized_keys <<EOF
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
+EOF
+chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
