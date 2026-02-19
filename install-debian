@@ -9,6 +9,39 @@ set -euo pipefail
 
 test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
+
+
+# Lock root account (no password, no direct login)
+passwd -l root
+
+# Remove non-root users created by cloud providers
+awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
+
+# Disable and remove provider-created swap
+swapoff -a 2>/dev/null || true
+sed -i '/swap/d' /etc/fstab
+
+# Regenerate machine-id
+systemd-machine-id-setup
+
+# Get rid of garbage in grub file
+sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
+
+# Set locale and timezone
+echo 'LANG=en_US.UTF-8'  > /etc/locale.conf
+echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
+ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+echo "UTC" > /etc/timezone
+
+# Reset hosts file
+cat > /etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost ip6-localhost ip6-loopback
+EOF
+
+
+
+# TODO: _required_packages; merged with _allowed. Required MUST be installed whereas allowed CAN be installed
 _allowed_packages=(
     # Kernel & boot (Debian)
     linux-image-amd64 linux-image-cloud-amd64 linux-image-arm64 linux-image-cloud-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
@@ -28,9 +61,8 @@ _allowed_packages=(
     sudo netplan.io systemd-resolved
 )
 
-# TODO: _required_packages; merged with _allowed. Required MUST be installed whereas allowed CAN be installed
-
-DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+# APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
+{ dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 
 # Build the list of installed packages to preserve; nuke everything else
 _preserve_packages=()
@@ -39,10 +71,6 @@ for pkg in "${_allowed_packages[@]}"; do
         _preserve_packages+=("${pkg}")
     fi
 done
-
-# APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
-{ dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
-
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
@@ -50,25 +78,14 @@ DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::=
 
 # Clear debconf database and normalize configs modified by cloud providers
 dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | DEBIAN_FRONTEND=noninteractive debconf-communicate {} > /dev/null'
-rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat{,-old} /var/cache/debconf/passwords.dat
-DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash dialog ca-certificates
+rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
+DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
-# another idea: get rid of files that don't belong to default packages
-# apt has a list of files
-# we can identify all files that shouldn't be there after we remove the appropriate packages
-
-# Lock root account (no password, no direct login)
-passwd -l root
-
-# Remove non-root users created by cloud providers
-awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
-
-# Disable and remove provider-created swap
-swapoff -a 2>/dev/null || true
-sed -i '/swap/d' /etc/fstab
-
+# Remove stale Python bytecode
+find /usr/lib /var -name '*.pyc' -delete
+# Cleanup unused files, files that can be regenerated, or provider-specific files
 rm -rf \
-    `# identity       ` /etc/{hostname,machine-id,adjtime} /var/lib/dbus/machine-id \
+    `# identity       ` /etc/{hostname,adjtime} \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# apt sources    ` /etc/apt/{sources.list,sources.list~,sources.list.d/*} \
     `# apt custom rs  ` /etc/crypttab \
@@ -77,7 +94,7 @@ rm -rf \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
     `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
-    `# pam            ` /etc/pam.d/{common-*,*.pam-old} \
+    `# pam            ` /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
     `# snap           ` /snap /var/{snap,lib/snapd} \
     `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
@@ -113,31 +130,8 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/{ncloud,nbp}
 
-# Remove stale Python bytecode
-find /usr/lib /var -name '*.pyc' -delete
 
-# Regenerate clean PAM config (removes stale references to uninstalled modules)
-DEBIAN_FRONTEND=noninteractive pam-auth-update --force
 
-# Regenerate machine-id
-systemd-machine-id-setup
-sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
-
-# # Regenerate SSH host key
-# ssh-keygen -A # `# SSH host keys  ` /etc/ssh/ssh_host_* \
-
-# Set locale
-echo 'LANG=en_US.UTF-8' > /etc/locale.conf
-echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
-
-# Set timezone to UTC
-ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-echo "UTC" > /etc/timezone
-
-cat > /etc/hosts <<EOF
-127.0.0.1   localhost
-::1         localhost ip6-localhost ip6-loopback
-EOF
 
 # Detect distro and write clean apt sources (deb822 format)
 . /etc/os-release
@@ -167,9 +161,11 @@ Components: ${_components}
 Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 
-# FUTURE: typical post-install done by other scripts
 
-apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+
+
+# FUTURE: the following is typical post-install done by other scripts
+DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite"
 DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
 apt-get clean -y
@@ -180,7 +176,4 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-# hash every file on the server
-# find / -path /run -prune -o -path /proc -prune -o -path /sys -prune -o -type f -exec sha256sum {} + > /root/debian-PROVIDER_HERE.txt
-
-# reboot
+reboot
