@@ -28,6 +28,8 @@ _allowed_packages=(
     sudo netplan.io systemd-resolved
 )
 
+DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+
 # Build the list of installed packages to preserve; nuke everything else
 _preserve_packages=()
 for pkg in "${_allowed_packages[@]}"; do
@@ -42,25 +44,39 @@ done
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false autoremove --purge
+DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+
+# TODO: confirm debconf-get-selections that values are all set properly
+
+# Normalize debconf values and overwrite configs modified by cloud providers
+rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc
+echo "openssh-server openssh-server/permit-root-login boolean true" | debconf-set-selections
+DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash
 
 # another idea: get rid of files that don't belong to default packages
 # apt has a list of files
 # we can identify all files that shouldn't be there after we remove the appropriate packages
 
+# Lock root account (no password, no direct login)
+passwd -l root
+
 # Remove non-root users created by cloud providers
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 
+# TODO: use brace expansion, e.g. `/opt/vultr /etc/vultr` => `/{opt,etc}/vultr`
+sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
+
 rm -rf \
-    `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
+    `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id /etc/adjtime \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
-    `# apt custom rs  ` /etc/crypttab /etc/apt/apt.conf.d/00aptitude /etc/apt/apt.conf.d/00InstallRecommends \
+    `# apt custom rs  ` /etc/crypttab \
     `# apt cache      ` /var/lib/apt/lists/* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
     `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip \
+    `# pam            ` /etc/pam.d/common-* /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
@@ -76,7 +92,7 @@ rm -rf \
     `# Vultr          ` /opt/vultr /etc/vultr \
     `# Equinix Metal  ` /opt/packet /etc/packet \
     `# OVHcloud       ` /opt/ovh /etc/ovh /usr/bin/noderig /usr/bin/beamium /etc/beamium /opt/noderig /opt/beamium \
-    `# Hetzner        ` /etc/hc-utils /etc/hetzner-build /etc/apt/apt.conf.d/99hetzner \
+    `# Hetzner        ` /etc/hc-utils /etc/hetzner-build \
     `# Ionos          ` /etc/ionos /opt/ionos \
     `# Scaleway       ` /etc/scaleway /opt/scaleway /usr/local/sbin/scw-* \
     `# Yandex Cloud   ` /opt/yandex /etc/yandex \
@@ -102,12 +118,12 @@ systemd-machine-id-setup
 # # Regenerate SSH host key
 # ssh-keygen -A # `# SSH host keys  ` /etc/ssh/ssh_host_* \
 
+# Set locale
+echo 'LANG=en_US.UTF-8' > /etc/locale.conf
+
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 echo "UTC" > /etc/timezone
-
-# Lock root account (no password, no direct login)
-passwd -l root
 
 cat > /etc/hosts <<EOF
 127.0.0.1   localhost
@@ -143,9 +159,9 @@ Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 
 apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" dist-upgrade
-DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false autoremove --purge
-apt-get -y clean
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite"
+DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+apt-get clean -y
 
 mkdir -p /root/.ssh/
 cat > /root/.ssh/authorized_keys <<EOF
