@@ -48,13 +48,20 @@ DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -
 # apt has a list of files
 # we can identify all files that shouldn't be there after we remove the appropriate packages
 
+# Remove non-root users created by cloud providers
+awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
+
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
+    `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    `# apt custom rs  ` /etc/crypttab /etc/apt/apt.conf.d/00aptitude /etc/apt/apt.conf.d/00InstallRecommends \
     `# apt cache      ` /var/lib/apt/lists/* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
+    `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip \
+    `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# Providers:     ` \
@@ -69,7 +76,7 @@ rm -rf \
     `# Vultr          ` /opt/vultr /etc/vultr \
     `# Equinix Metal  ` /opt/packet /etc/packet \
     `# OVHcloud       ` /opt/ovh /etc/ovh /usr/bin/noderig /usr/bin/beamium /etc/beamium /opt/noderig /opt/beamium \
-    `# Hetzner        ` /etc/hc-utils \
+    `# Hetzner        ` /etc/hc-utils /etc/hetzner-build /etc/apt/apt.conf.d/99hetzner \
     `# Ionos          ` /etc/ionos /opt/ionos \
     `# Scaleway       ` /etc/scaleway /opt/scaleway /usr/local/sbin/scw-* \
     `# Yandex Cloud   ` /opt/yandex /etc/yandex \
@@ -85,6 +92,9 @@ rm -rf \
     `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive /var/lib/qcloud \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/ncloud /opt/nbp
+
+# Regenerate clean PAM config (removes stale references to uninstalled modules)
+pam-auth-update --force
 
 # Regenerate machine-id
 systemd-machine-id-setup
@@ -146,4 +156,4 @@ chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 # hash every file on the server
 # find / -path /run -prune -o -path /proc -prune -o -path /sys -prune -o -type f -exec sha256sum {} + > /root/debian-PROVIDER_HERE.txt
 
-reboot
+#reboot
