@@ -28,6 +28,8 @@ _allowed_packages=(
     sudo netplan.io systemd-resolved
 )
 
+# TODO: _required_packages; merged with _allowed. Required MUST be installed whereas allowed CAN be installed
+
 DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 
 # Build the list of installed packages to preserve; nuke everything else
