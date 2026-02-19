@@ -7,14 +7,7 @@ set -euo pipefail
 # Cherry Servers, Alibaba Cloud, Huawei Cloud, Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages,
 # repos, configs, and services, then strips everything not in the whitelist.
 
-test "${EUID}" -eq 0    || { echo "Error: must run as root"                             >&2; exit 1; }
-test -f /etc/os-release || { echo "Error: RPM-based Linux distribution required."       >&2; exit 1; }
-
-. /etc/os-release
-case "${ID}" in
-    fedora|centos|rhel|rocky|almalinux) ;;
-    *) echo "Error: unsupported distro '${ID}'. Expected fedora, centos, rhel, rocky, or almalinux." >&2; exit 1 ;;
-esac
+test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 _allowed_packages=(
     # Kernel & boot
@@ -36,12 +29,12 @@ _allowed_packages=(
 # Build the list of installed packages to preserve; nuke everything else
 _preserve_packages=()
 for pkg in "${_allowed_packages[@]}"; do
-    if rpm -q "${pkg}" &>/dev/null; then
+    if rpm -q "${pkg}" > /dev/null 2>&1; then
         _preserve_packages+=("${pkg}")
     fi
 done
 # DNF5 (Fedora 41+, CentOS 10+) renamed mark subcommands: install→user, remove→dependency
-if dnf5 --version &>/dev/null; then
+if dnf5 --version > /dev/null 2>&1; then
     dnf -y mark dependency '*' > /dev/null 2>&1
     dnf -y mark user "${_preserve_packages[@]}" > /dev/null 2>&1
 else
@@ -62,10 +55,8 @@ rm -rf \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# Providers:     ` \
     `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
-                        /etc/yum.repos.d/amzn*.repo \
     `# Azure          ` /var/lib/waagent /etc/waagent.conf /opt/microsoft /var/opt/microsoft /etc/opt/microsoft /opt/omi \
     `# GCP            ` /etc/default/instance_configs.cfg* /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google \
-                        /etc/yum.repos.d/google-cloud.repo \
     `# IBM Cloud      ` /opt/IBM /opt/bnpp /opt/BUAgent /opt/draios \
     `# Oracle Cloud   ` /opt/oracle-cloud* /etc/oracle-cloud* /usr/libexec/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
@@ -108,6 +99,7 @@ cat > /etc/hosts <<EOF
 EOF
 
 # Write clean repo files based on distro
+. /etc/os-release
 case "${ID}" in
     fedora)
         _repo_file="fedora.repo"

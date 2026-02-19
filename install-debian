@@ -7,14 +7,7 @@ set -euo pipefail
 # Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages, repos, configs, and services, then strips
 # everything not in the whitelist.
 
-test "${EUID}" -eq 0    || { echo "Error: must run as root"                          >&2; exit 1; }
-test -f /etc/os-release || { echo "Error: Debian-based Linux distribution required." >&2; exit 1; }
-
-. /etc/os-release
-case "${ID}" in
-    debian|ubuntu) ;;
-    *) echo "Error: unsupported distro '${ID}'. Expected debian or ubuntu." >&2; exit 1 ;;
-esac
+test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 _allowed_packages=(
     # Kernel & boot (Debian)
@@ -34,7 +27,7 @@ _allowed_packages=(
     sudo netplan.io systemd-resolved
 )
 
-# build the list of packages (and dependencies to preserve); nuke everything else
+# Build the list of packages (and dependencies to preserve); nuke everything else
 _preserve_packages=()
 for pkg in "${_allowed_packages[@]}"; do
     if dpkg-query -W -f='${Status}' "${pkg}" 2>/dev/null | grep -q "install ok installed"; then
@@ -101,15 +94,19 @@ cat > /etc/hosts <<EOF
 EOF
 
 # Detect distro and write clean apt sources (deb822 format)
-if [[ "${ID}" == "debian" ]]; then
-    _repo_uri="http://deb.debian.org/debian"
-    _security_uri="http://deb.debian.org/debian-security"
-    _components="main"
-else
-    _repo_uri="http://archive.ubuntu.com/ubuntu"
-    _security_uri="http://security.ubuntu.com/ubuntu"
-    _components="main restricted universe"
-fi
+. /etc/os-release
+case "${ID}" in
+    debian)
+        _repo_uri="http://deb.debian.org/debian"
+        _security_uri="http://deb.debian.org/debian-security"
+        _components="main"
+        ;;
+    ubuntu)
+        _repo_uri="http://archive.ubuntu.com/ubuntu"
+        _security_uri="http://security.ubuntu.com/ubuntu"
+        _components="main restricted universe"
+        ;;
+esac
 cat > "/etc/apt/sources.list.d/${ID}.sources" <<EOF
 Types: deb
 URIs: ${_repo_uri}
