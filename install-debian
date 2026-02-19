@@ -21,7 +21,7 @@ _allowed_packages=(
     # Base system
     base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip login passwd sed tar util-linux
     # Networking & DHCP
-    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5
+    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ifupdown
     # SSH & cloud-init
     openssh-server openssh-client cloud-init
     # Basics & distro-specific
@@ -91,7 +91,7 @@ ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 echo "UTC" > /etc/timezone
 
 # Lock root account (no password, no direct login)
-passwd -l root
+# passwd -l root
 
 cat > /etc/hosts <<EOF
 127.0.0.1   localhost
@@ -136,3 +136,6 @@ cat > /root/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
+
+# hash every file on the server
+# find / -path /run -prune -o -path /proc -prune -o -path /sys -prune -o -type f -exec sha256sum {} + > /root/debian-PROVIDER_HERE.txt
