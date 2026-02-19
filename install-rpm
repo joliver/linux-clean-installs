@@ -18,7 +18,7 @@ esac
 
 _allowed_packages=(
     # Kernel & boot
-    kernel grub2-efi-x64 grub2-tools shim-x64 dracut
+    kernel grub2-pc grub2-efi-x64 grub2-efi-aa64 grub2-efi-ia32 grub2-ppc64le grub2-tools shim-x64 shim-aa64 shim-ia32 dracut
     # Init, system, package management
     systemd dbus dnf dnf5 rpm
     # Base system
