@@ -110,11 +110,13 @@ Types: deb
 URIs: ${_repo_uri}
 Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
 Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 
 Types: deb
 URIs: ${_security_uri}
 Suites: ${VERSION_CODENAME}-security
 Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 
 apt-get update
