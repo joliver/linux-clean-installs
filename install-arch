@@ -44,6 +44,7 @@ rm -rf \
     `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# motd/banners   ` /etc/motd /etc/motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \

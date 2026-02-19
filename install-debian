@@ -38,8 +38,8 @@ done
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" autoremove --purge
-apt-get -y clean
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" purge cron 2> /dev/null || true
+apt-get -y clean
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
@@ -48,6 +48,7 @@ rm -rf \
     `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \

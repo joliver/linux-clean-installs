@@ -43,7 +43,8 @@ else
 fi
 dnf -y mark "${_mark_auto}" '*' > /dev/null 2>&1
 dnf -y mark "${_mark_manual}" "${_preserve_packages[@]}" > /dev/null 2>&1
-dnf -y autoremove; dnf -y clean all
+dnf -y autoremove
+dnf -y clean all
 dnf -y remove cronie 2> /dev/null || true
 
 rm -rf \
@@ -53,6 +54,7 @@ rm -rf \
     `# SSH host keys  ` /etc/ssh/ssh_host_* \
     `# root home      ` /root/* /root/.[!.]* \
     `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# motd/banners   ` /etc/motd /etc/motd.d/* /run/motd.dynamic \
     `# shell history  ` /home/*/.bash_history \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
