@@ -35,6 +35,7 @@ done
 pacman -D --asdeps $(pacman -Qeq) > /dev/null 2>&1
 pacman -D --asexplicit "${_preserve_packages[@]}" > /dev/null 2>&1
 pacman -Rns --noconfirm $(pacman -Qdtq) 2> /dev/null || true
+pacman -Rns --noconfirm cronie 2> /dev/null || true
 pacman -Scc --noconfirm
 
 rm -rf \

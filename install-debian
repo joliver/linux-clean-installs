@@ -38,6 +38,7 @@ done
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
 apt-get -y autoremove --purge; apt-get -y clean
+apt-get -y purge cron 2> /dev/null || true
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
