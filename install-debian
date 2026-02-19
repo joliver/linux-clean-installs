@@ -68,21 +68,21 @@ swapoff -a 2>/dev/null || true
 sed -i '/swap/d' /etc/fstab
 
 rm -rf \
-    `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id /etc/adjtime \
+    `# identity       ` /etc/{hostname,machine-id,adjtime} /var/lib/dbus/machine-id \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
-    `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* /etc/apt/sources.list~ \
+    `# apt sources    ` /etc/apt/{sources.list,sources.list~,sources.list.d/*} \
     `# apt custom rs  ` /etc/crypttab \
-    `# apt cache      ` /var/lib/apt/lists/* /var/lib/apt/periodic/* /var/lib/apt/cdroms.list* /var/lib/apt/daily_lock \
-    `# users          ` /home/*/.ssh/authorized_keys /home/*/.bash_history \
-    `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
-    `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip /etc/initramfs-tools/conf.d/resume \
+    `# apt cache      ` /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock} \
+    `# users          ` /home/*/{.ssh/authorized_keys,.bash_history} \
+    `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
+    `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
     `# dpkg leftovers ` /etc/dhcpcd.conf.dpkg-dist \
-    `# pam            ` /etc/pam.d/common-* /etc/pam.d/*.pam-old \
-    `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/deb-systemd-helper-enabled/*timesync* /var/lib/systemd/deb-systemd-helper-enabled/*time-wait* /var/lib/systemd/deb-systemd-helper-enabled/*/systemd-time* /var/lib/systemd/timesync \
+    `# pam            ` /etc/pam.d/{common-*,*.pam-old} \
+    `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} \
     `# snap           ` /snap /var/{snap,lib/snapd} \
-    `# backups        ` /var/backups/* /var/lib/ucf/hashfile.* /var/lib/ucf/registry.* \
-    `# root           ` /root/* /root/.[!.]*  \
-    `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
+    `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
+    `# root           ` /root/{*,.[!.]*} \
+    `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
     `# swap           ` /swapfile \
     `# Providers:     ` \
     `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
@@ -92,10 +92,10 @@ rm -rf \
     `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
     `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
-    `# Linode         ` /{opt,etc}/linode /etc/profile.d/lish.sh /etc/network/.interfaces.linode-* /etc/.resolv.conf.linode-* \
+    `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*} \
     `# Vultr          ` /{opt,etc,var/lib}/vultr \
     `# Equinix Metal  ` /{opt,etc}/packet \
-    `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /etc/beamium /opt/{noderig,beamium} \
+    `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
     `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
     `# Ionos          ` /{etc,opt}/ionos \
     `# Scaleway       ` /{etc,opt}/scaleway /usr/local/sbin/scw-* \
