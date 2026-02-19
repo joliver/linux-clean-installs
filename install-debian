@@ -17,11 +17,11 @@ _allowed_packages=(
     # Kernel & boot (Ubuntu)
     linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
     # Init, system, package management
-    systemd systemd-sysv dbus udev apt dpkg
+    systemd systemd-sysv dbus udev apt dpkg dialog
     # Base system
     base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip zstd login passwd sed tar util-linux
     # Networking & DHCP
-    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ethtool ifupdown
+    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ifupdown
     # SSH & cloud-init
     openssh-server openssh-client cloud-init
     # Basics & distro-specific
@@ -70,17 +70,18 @@ sed -i '/swap/d' /etc/fstab
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id /etc/adjtime \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
-    `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* /etc/apt/sources.list~ \
     `# apt custom rs  ` /etc/crypttab \
-    `# apt cache      ` /var/lib/apt/lists/* /var/lib/apt/periodic/* \
+    `# apt cache      ` /var/lib/apt/lists/* /var/lib/apt/periodic/* /var/lib/apt/cdroms.list* /var/lib/apt/daily_lock \
     `# users          ` /home/*/.ssh/authorized_keys /home/*/.bash_history \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
-    `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip \
+    `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip /etc/initramfs-tools/conf.d/resume \
+    `# dpkg leftovers ` /etc/dhcpcd.conf.dpkg-dist \
     `# pam            ` /etc/pam.d/common-* /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/deb-systemd-helper-enabled/*timesync* /var/lib/systemd/deb-systemd-helper-enabled/*time-wait* /var/lib/systemd/deb-systemd-helper-enabled/*/systemd-time* /var/lib/systemd/timesync \
     `# snap           ` /snap /var/{snap,lib/snapd} \
     `# backups        ` /var/backups/* /var/lib/ucf/hashfile.* /var/lib/ucf/registry.* \
-    `# root           ` /root `# recreated later` \
+    `# root           ` /root/* /root/.[!.]*  \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# swap           ` /swapfile \
     `# Providers:     ` \
@@ -91,7 +92,7 @@ rm -rf \
     `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
     `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
-    `# Linode         ` /{opt,etc}/linode \
+    `# Linode         ` /{opt,etc}/linode /etc/profile.d/lish.sh /etc/network/.interfaces.linode-* /etc/.resolv.conf.linode-* \
     `# Vultr          ` /{opt,etc,var/lib}/vultr \
     `# Equinix Metal  ` /{opt,etc}/packet \
     `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /etc/beamium /opt/{noderig,beamium} \
@@ -113,7 +114,7 @@ rm -rf \
     `# Naver Cloud    ` /opt/{ncloud,nbp}
 
 # Regenerate clean PAM config (removes stale references to uninstalled modules)
-pam-auth-update --force
+DEBIAN_FRONTEND=noninteractive pam-auth-update --force
 
 # Regenerate machine-id
 systemd-machine-id-setup
@@ -176,4 +177,4 @@ chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 # hash every file on the server
 # find / -path /run -prune -o -path /proc -prune -o -path /sys -prune -o -type f -exec sha256sum {} + > /root/debian-PROVIDER_HERE.txt
 
-#reboot
+# reboot
