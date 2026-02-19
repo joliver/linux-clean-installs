@@ -12,7 +12,7 @@ test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 # Detect distro and write clean apt sources (deb822 format)
 . /etc/os-release
-rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*} \
+rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d} \
        /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
 case "${ID}" in
     debian)
@@ -51,9 +51,6 @@ awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 swapoff -a 2>/dev/null || true
 sed -i '/swap/d' /etc/fstab
 
-# Regenerate machine-id
-systemd-machine-id-setup
-
 # Get rid of garbage in grub file
 sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
 
@@ -90,6 +87,8 @@ _allowed_packages=(
     sudo netplan.io systemd-resolved
 )
 
+DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+
 # APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
 { dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 
@@ -115,7 +114,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::
 find /usr/lib /var -name '*.pyc' -delete
 # Cleanup unused files, files that can be regenerated, or provider-specific files
 rm -rf \
-    `# identity       ` /etc/{hostname,adjtime} \
+    `# identity       ` /etc/{hostname,adjtime,aliases,mailname,cloud-release} \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# crypt tab      ` /etc/crypttab \
     `# users          ` /home/*/{.ssh/authorized_keys,.bash_history} \
@@ -125,6 +124,7 @@ rm -rf \
     `# pam            ` /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
     `# snap           ` /snap /var/{snap,lib/snapd} \
+    `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
     `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
     `# root           ` /root/{*,.[!.]*} \
     `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
@@ -136,7 +136,7 @@ rm -rf \
     `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
     `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
-    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
+    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service \
     `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*} \
     `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
     `# Equinix Metal  ` /{opt,etc}/packet \
@@ -161,8 +161,12 @@ rm -rf \
 
 
 
+# FUTURE: the following is typical post-install done by other scripts (for snapshotting)
 
-# FUTURE: the following is typical post-install done by other scripts
+# Regenerate machine-id
+# systemd-machine-id-setup
+# Regenerate SSH security keys
+
 DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite"
 DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
@@ -174,4 +178,4 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-reboot
+# reboot
