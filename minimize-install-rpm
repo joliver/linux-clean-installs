@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Minimize a Fedora, CentOS Stream, RHEL, Rocky Linux, or AlmaLinux cloud image to a provider-agnostic baseline.
+# Removes AWS, Azure, GCP, IBM Cloud, Oracle Cloud, Rackspace, DigitalOcean, Linode, Vultr, Equinix Metal,
+# OVHcloud, Hetzner, Ionos, Scaleway, Yandex Cloud, UpCloud, Exoscale, Leaseweb, Selectel, Gcore, Civo,
+# Cherry Servers, Alibaba Cloud, Huawei Cloud, Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages,
+# repos, configs, and services, then strips everything not in the whitelist.
+
+test "${EUID}" -eq 0    || { echo "Error: must run as root"                             >&2; exit 1; }
+test -f /etc/os-release || { echo "Error: RPM-based Linux distribution required."       >&2; exit 1; }
+
+. /etc/os-release
+case "${ID}" in
+    fedora|centos|rhel|rocky|almalinux) ;;
+    *) echo "Error: unsupported distro '${ID}'. Expected fedora, centos, rhel, rocky, or almalinux." >&2; exit 1 ;;
+esac
+
+_allowed_packages=(
+    # Kernel & boot
+    kernel grub2-efi-x64 grub2-tools shim-x64 dracut
+    # Init, system, package management
+    systemd dbus dnf dnf5 rpm
+    # Base system
+    basesystem bash coreutils diffutils findutils grep gzip shadow-utils sed tar util-linux
+    # Networking & DHCP
+    iproute ca-certificates curl NetworkManager dhcp-client
+    # SSH & cloud-init
+    openssh-server openssh-clients cloud-init
+    # Basics
+    sudo
+    # Distro release packages (only the installed one will match)
+    fedora-release centos-stream-release redhat-release rocky-release almalinux-release
+)
+
+# Build the list of installed packages to preserve; nuke everything else
+_preserve_packages=()
+for pkg in "${_allowed_packages[@]}"; do
+    if rpm -q "${pkg}" &>/dev/null; then
+        _preserve_packages+=("${pkg}")
+    fi
+done
+# DNF5 (Fedora 41+, CentOS 10+) renamed mark subcommands: install→user, remove→dependency
+if dnf5 --version &>/dev/null; then
+    dnf -y mark dependency '*' > /dev/null 2>&1
+    dnf -y mark user "${_preserve_packages[@]}" > /dev/null 2>&1
+else
+    dnf -y mark remove '*' > /dev/null 2>&1
+    dnf -y mark install "${_preserve_packages[@]}" > /dev/null 2>&1
+fi
+dnf -y autoremove; dnf -y clean all
+
+rm -rf \
+    `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
+    `# dnf repos      ` /etc/yum.repos.d/* \
+    `# dnf cache      ` /var/cache/dnf/* \
+    `# SSH host keys  ` /etc/ssh/ssh_host_* \
+    `# root home      ` /root/* /root/.[!.]* \
+    `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# shell history  ` /home/*/.bash_history \
+    `# snap           ` /snap /var/snap /var/lib/snapd \
+    `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
+    `# Providers:     ` \
+    `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
+                        /etc/yum.repos.d/amzn*.repo \
+    `# Azure          ` /var/lib/waagent /etc/waagent.conf /opt/microsoft /var/opt/microsoft /etc/opt/microsoft /opt/omi \
+    `# GCP            ` /etc/default/instance_configs.cfg* /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google \
+                        /etc/yum.repos.d/google-cloud.repo \
+    `# IBM Cloud      ` /opt/IBM /opt/bnpp /opt/BUAgent /opt/draios \
+    `# Oracle Cloud   ` /opt/oracle-cloud* /etc/oracle-cloud* /usr/libexec/oracle-cloud* /var/lib/oracle-cloud-agent \
+    `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
+    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
+    `# Linode         ` /opt/linode /etc/linode \
+    `# Vultr          ` /opt/vultr /etc/vultr \
+    `# Equinix Metal  ` /opt/packet /etc/packet \
+    `# OVHcloud       ` /opt/ovh /etc/ovh /usr/bin/noderig /usr/bin/beamium /etc/beamium /opt/noderig /opt/beamium \
+    `# Hetzner        ` /etc/hc-utils \
+    `# Ionos          ` /etc/ionos /opt/ionos \
+    `# Scaleway       ` /etc/scaleway /opt/scaleway /usr/local/sbin/scw-* \
+    `# Yandex Cloud   ` /opt/yandex /etc/yandex \
+    `# UpCloud        ` /etc/upcloud /opt/upcloud \
+    `# Exoscale       ` /etc/exoscale /opt/exoscale \
+    `# Leaseweb       ` /opt/leaseweb \
+    `# Selectel       ` /opt/selectel \
+    `# Gcore          ` /etc/gcore /opt/gcore \
+    `# Civo           ` /etc/civo /opt/civo \
+    `# Cherry Servers ` /etc/cherry /opt/cherry \
+    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/cloudmonitor /usr/local/share/aliyun-assist /usr/local/share/assist-daemon \
+    `# Huawei Cloud   ` /usr/local/hostguard /opt/huawei \
+    `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive /var/lib/qcloud \
+    `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
+    `# Naver Cloud    ` /opt/ncloud /opt/nbp
+
+# Regenerate machine-id and SSH host keys
+systemd-machine-id-setup
+# ssh-keygen -A
+
+# Set timezone to UTC
+ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+echo "UTC" > /etc/timezone
+
+# Lock root account (no password, no direct login)
+passwd -l root
+
+cat > /etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost ip6-localhost ip6-loopback
+EOF
+
+# Write clean repo files based on distro
+case "${ID}" in
+    fedora)
+        _repo_file="fedora.repo"
+        _baseos_id="fedora";    _baseos_name="Fedora \$releasever - \$basearch"
+        _baseos_url="metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-\$releasever&arch=\$basearch"
+        _appstream_id="updates";   _appstream_name="Fedora \$releasever - \$basearch - Updates"
+        _appstream_url="metalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f\$releasever&arch=\$basearch"
+        _gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-\$releasever-\$basearch"
+        ;;
+    centos)
+        _repo_file="centos.repo"
+        _baseos_id="baseos";    _baseos_name="CentOS Stream \$releasever - BaseOS"
+        _baseos_url="metalink=https://mirrors.centos.org/metalink?repo=centos-baseos-\$stream&arch=\$basearch&protocol=https,http"
+        _appstream_id="appstream"; _appstream_name="CentOS Stream \$releasever - AppStream"
+        _appstream_url="metalink=https://mirrors.centos.org/metalink?repo=centos-appstream-\$stream&arch=\$basearch&protocol=https,http"
+        _gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial"
+        ;;
+    rhel)
+        _repo_file="rhel.repo"
+        _baseos_id="baseos";    _baseos_name="Red Hat Enterprise Linux \$releasever - BaseOS"
+        _baseos_url="baseurl=https://cdn.redhat.com/content/dist/rhel\$releasever/\$releasever/\$basearch/baseos/os"
+        _appstream_id="appstream"; _appstream_name="Red Hat Enterprise Linux \$releasever - AppStream"
+        _appstream_url="baseurl=https://cdn.redhat.com/content/dist/rhel\$releasever/\$releasever/\$basearch/appstream/os"
+        _gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
+        ;;
+    rocky)
+        _repo_file="rocky.repo"
+        _baseos_id="baseos";    _baseos_name="Rocky Linux \$releasever - BaseOS"
+        _baseos_url="mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=\$basearch&repo=BaseOS-\$releasever"
+        _appstream_id="appstream"; _appstream_name="Rocky Linux \$releasever - AppStream"
+        _appstream_url="mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=\$basearch&repo=AppStream-\$releasever"
+        _gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-\$releasever"
+        ;;
+    almalinux)
+        _repo_file="almalinux.repo"
+        _baseos_id="baseos";    _baseos_name="AlmaLinux \$releasever - BaseOS"
+        _baseos_url="mirrorlist=https://mirrors.almalinux.org/mirrorlist/\$releasever/baseos"
+        _appstream_id="appstream"; _appstream_name="AlmaLinux \$releasever - AppStream"
+        _appstream_url="mirrorlist=https://mirrors.almalinux.org/mirrorlist/\$releasever/appstream"
+        _gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-\$releasever"
+        ;;
+esac
+cat > "/etc/yum.repos.d/${_repo_file}" <<EOF
+[${_baseos_id}]
+name=${_baseos_name}
+${_baseos_url}
+enabled=1
+gpgcheck=1
+gpgkey=${_gpgkey}
+
+[${_appstream_id}]
+name=${_appstream_name}
+${_appstream_url}
+enabled=1
+gpgcheck=1
+gpgkey=${_gpgkey}
+EOF
+
+dnf -y distro-sync
+dnf -y autoremove
+dnf -y clean all
+
+mkdir -p /root/.ssh/
+cat > /root/.ssh/authorized_keys <<EOF
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
+EOF
+chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
