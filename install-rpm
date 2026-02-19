@@ -34,13 +34,15 @@ for pkg in "${_allowed_packages[@]}"; do
     fi
 done
 # DNF5 (Fedora 41+, CentOS 10+) renamed mark subcommands: install→user, remove→dependency
-if dnf5 --version > /dev/null 2>&1; then
-    dnf -y mark dependency '*' > /dev/null 2>&1
-    dnf -y mark user "${_preserve_packages[@]}" > /dev/null 2>&1
+if command -v dnf5 > /dev/null 2>&1; then
+    _mark_auto="dependency"
+    _mark_manual="user"
 else
-    dnf -y mark remove '*' > /dev/null 2>&1
-    dnf -y mark install "${_preserve_packages[@]}" > /dev/null 2>&1
+    _mark_auto="remove"
+    _mark_manual="install"
 fi
+dnf -y mark "${_mark_auto}" '*' > /dev/null 2>&1
+dnf -y mark "${_mark_manual}" "${_preserve_packages[@]}" > /dev/null 2>&1
 dnf -y autoremove; dnf -y clean all
 
 rm -rf \

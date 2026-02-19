@@ -14,13 +14,13 @@ Bash scripts that strip cloud images down to a provider-agnostic baseline. They 
 
 ## How It Works
 
-1. Validates distro ID from `/etc/os-release`
-2. Defines a whitelist of allowed packages (`_allowed_packages`)
-3. Marks all installed packages as auto-removable, then marks whitelisted ones as manual
-4. Removes everything not whitelisted (`apt-get autoremove --purge`, `dnf autoremove`, or `pacman -Rns`)
-5. Deletes provider-specific files, caches, logs, identity files, and all of `/root`
+1. Defines a whitelist of allowed packages (`_allowed_packages`)
+2. Marks all installed packages as auto-removable, then marks whitelisted ones as manual
+3. Removes everything not whitelisted (`apt-get autoremove --purge`, `dnf autoremove`, or `pacman -Rns`)
+4. Deletes provider-specific files, caches, logs, identity files, and all of `/root`
+5. Regenerates machine-id and SSH host keys
 6. Sets timezone to UTC and locks the root account
-7. Writes `/etc/hosts` and regenerates machine-id
+7. Writes `/etc/hosts`
 8. Writes clean package sources (deb822 for Debian/Ubuntu, yum repo files for RPM distros, pacman mirrorlist/config for Arch)
 9. Runs dist-upgrade/distro-sync/`pacman -Syu` and a final autoremove
 

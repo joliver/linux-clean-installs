@@ -31,8 +31,9 @@ for pkg in "${_allowed_packages[@]}"; do
         _preserve_packages+=("${pkg}")
     fi
 done
-pacman -D --asdeps $(pacman -Qeq) > /dev/null 2>&1   # mark all as dependencies (can be removed)
-pacman -D --asexplicit "${_preserve_packages[@]}" > /dev/null 2>&1   # mark keepers as explicit
+# Mark all as dependencies (can be removed), then mark keepers as explicit
+pacman -D --asdeps $(pacman -Qeq) > /dev/null 2>&1
+pacman -D --asexplicit "${_preserve_packages[@]}" > /dev/null 2>&1
 pacman -Rns --noconfirm $(pacman -Qdtq) 2> /dev/null || true
 pacman -Scc --noconfirm
 
