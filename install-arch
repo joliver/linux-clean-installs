@@ -11,7 +11,8 @@ test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 _allowed_packages=(
     # Kernel & boot
-    linux linux-firmware grub efibootmgr dosfstools mkinitcpio
+    linux linux-firmware amd-ucode intel-ucode
+    grub efibootmgr dosfstools mkinitcpio
     # Init, system, package management
     systemd dbus pacman
     # Base system

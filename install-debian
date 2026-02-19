@@ -12,6 +12,7 @@ test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 _allowed_packages=(
     # Kernel & boot (Debian)
     linux-image-amd64 linux-image-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
+    amd64-microcode intel-microcode
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     # Kernel & boot (Ubuntu)
     linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
