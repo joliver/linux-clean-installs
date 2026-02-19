@@ -63,19 +63,26 @@ passwd -l root
 # Remove non-root users created by cloud providers
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 
+# Disable and remove provider-created swap
+swapoff -a 2>/dev/null || true
+sed -i '/swap/d' /etc/fstab
+
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id /etc/adjtime \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
     `# apt custom rs  ` /etc/crypttab \
-    `# apt cache      ` /var/lib/apt/lists/* \
+    `# apt cache      ` /var/lib/apt/lists/* /var/lib/apt/periodic/* \
     `# users          ` /home/*/.ssh/authorized_keys /home/*/.bash_history \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
     `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip \
     `# pam            ` /etc/pam.d/common-* /etc/pam.d/*.pam-old \
-    `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd \
+    `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/deb-systemd-helper-enabled/*timesync* /var/lib/systemd/deb-systemd-helper-enabled/*time-wait* /var/lib/systemd/deb-systemd-helper-enabled/*/systemd-time* /var/lib/systemd/timesync \
     `# snap           ` /snap /var/{snap,lib/snapd} \
+    `# backups        ` /var/backups/* /var/lib/ucf/hashfile.* /var/lib/ucf/registry.* \
+    `# root           ` /root `# recreated later` \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
+    `# swap           ` /swapfile \
     `# Providers:     ` \
     `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
     `# Azure          ` /var/lib/waagent /etc/waagent.conf /{opt,var/opt,etc/opt}/microsoft /opt/omi \
@@ -85,7 +92,7 @@ rm -rf \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
     `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
     `# Linode         ` /{opt,etc}/linode \
-    `# Vultr          ` /{opt,etc}/vultr \
+    `# Vultr          ` /{opt,etc,var/lib}/vultr \
     `# Equinix Metal  ` /{opt,etc}/packet \
     `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /etc/beamium /opt/{noderig,beamium} \
     `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
