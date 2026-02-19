@@ -37,8 +37,9 @@ done
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
-apt-get -y autoremove --purge; apt-get -y clean
-apt-get -y purge cron 2> /dev/null || true
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" autoremove --purge
+apt-get -y clean
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" purge cron 2> /dev/null || true
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
