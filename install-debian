@@ -51,8 +51,8 @@ awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 swapoff -a 2>/dev/null || true
 sed -i '/swap/d' /etc/fstab
 
-# Get rid of garbage in grub file
-sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
+# Get rid of garbage in grub file, if any
+test -f /etc/default/grub && sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
 
 # Set locale and timezone
 echo 'LANG=en_US.UTF-8'  > /etc/locale.conf
@@ -120,9 +120,9 @@ rm -rf \
     `# users          ` /home/*/{.ssh/authorized_keys,.bash_history} \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
-    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
+    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
     `# pam            ` /etc/pam.d/*.pam-old \
-    `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/dhcp/dhclient-exit-hooks.d/timesyncd /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
+    `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
     `# snap           ` /snap /var/{snap,lib/snapd} \
     `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
     `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
