@@ -63,57 +63,54 @@ passwd -l root
 # Remove non-root users created by cloud providers
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 
-# TODO: use brace expansion, e.g. `/opt/vultr /etc/vultr` => `/{opt,etc}/vultr`
-sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
-
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id /etc/adjtime \
     `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
     `# apt custom rs  ` /etc/crypttab \
     `# apt cache      ` /var/lib/apt/lists/* \
-    `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# users          ` /home/*/.ssh/authorized_keys /home/*/.bash_history \
     `# motd/banners   ` /etc/motd /etc/update-motd.d/* /run/motd.dynamic \
-    `# shell history  ` /home/*/.bash_history \
     `# cloud-init     ` /etc/sudoers.d/* /etc/ssh/sshd_config.d/* /etc/skel/.cloud-locale-test.skip \
     `# pam            ` /etc/pam.d/common-* /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/timesyncd.conf /etc/systemd/timesyncd.conf.d /etc/dhcp/dhclient-exit-hooks.d/timesyncd \
-    `# snap           ` /snap /var/snap /var/lib/snapd \
+    `# snap           ` /snap /var/{snap,lib/snapd} \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# Providers:     ` \
     `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
-    `# Azure          ` /var/lib/waagent /etc/waagent.conf /opt/microsoft /var/opt/microsoft /etc/opt/microsoft /opt/omi \
+    `# Azure          ` /var/lib/waagent /etc/waagent.conf /{opt,var/opt,etc/opt}/microsoft /opt/omi \
     `# GCP            ` /etc/default/instance_configs.cfg* /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google \
-    `# IBM Cloud      ` /opt/IBM /opt/bnpp /opt/BUAgent /opt/draios \
-    `# Oracle Cloud   ` /opt/oracle-cloud* /etc/oracle-cloud* /usr/libexec/oracle-cloud* /var/lib/oracle-cloud-agent \
+    `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
+    `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
     `# DigitalOcean   ` /opt/digitalocean /etc/do-agent \
-    `# Linode         ` /opt/linode /etc/linode \
-    `# Vultr          ` /opt/vultr /etc/vultr \
-    `# Equinix Metal  ` /opt/packet /etc/packet \
-    `# OVHcloud       ` /opt/ovh /etc/ovh /usr/bin/noderig /usr/bin/beamium /etc/beamium /opt/noderig /opt/beamium \
-    `# Hetzner        ` /etc/hc-utils /etc/hetzner-build \
-    `# Ionos          ` /etc/ionos /opt/ionos \
-    `# Scaleway       ` /etc/scaleway /opt/scaleway /usr/local/sbin/scw-* \
-    `# Yandex Cloud   ` /opt/yandex /etc/yandex \
-    `# UpCloud        ` /etc/upcloud /opt/upcloud \
-    `# Exoscale       ` /etc/exoscale /opt/exoscale \
+    `# Linode         ` /{opt,etc}/linode \
+    `# Vultr          ` /{opt,etc}/vultr \
+    `# Equinix Metal  ` /{opt,etc}/packet \
+    `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /etc/beamium /opt/{noderig,beamium} \
+    `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
+    `# Ionos          ` /{etc,opt}/ionos \
+    `# Scaleway       ` /{etc,opt}/scaleway /usr/local/sbin/scw-* \
+    `# Yandex Cloud   ` /{opt,etc}/yandex \
+    `# UpCloud        ` /{etc,opt}/upcloud \
+    `# Exoscale       ` /{etc,opt}/exoscale \
     `# Leaseweb       ` /opt/leaseweb \
     `# Selectel       ` /opt/selectel \
-    `# Gcore          ` /etc/gcore /opt/gcore \
-    `# Civo           ` /etc/civo /opt/civo \
-    `# Cherry Servers ` /etc/cherry /opt/cherry \
-    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/cloudmonitor /usr/local/share/aliyun-assist /usr/local/share/assist-daemon \
+    `# Gcore          ` /{etc,opt}/gcore \
+    `# Civo           ` /{etc,opt}/civo \
+    `# Cherry Servers ` /{etc,opt}/cherry \
+    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/{cloudmonitor,share/aliyun-assist,share/assist-daemon} \
     `# Huawei Cloud   ` /usr/local/hostguard /opt/huawei \
-    `# Tencent Cloud  ` /usr/local/qcloud /usr/local/tat-agent /usr/local/barad /usr/local/sgagent /usr/local/YDLive /var/lib/qcloud \
+    `# Tencent Cloud  ` /usr/local/{qcloud,tat-agent,barad,sgagent,YDLive} /var/lib/qcloud \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
-    `# Naver Cloud    ` /opt/ncloud /opt/nbp
+    `# Naver Cloud    ` /opt/{ncloud,nbp}
 
 # Regenerate clean PAM config (removes stale references to uninstalled modules)
 pam-auth-update --force
 
 # Regenerate machine-id
 systemd-machine-id-setup
+sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
 
 # # Regenerate SSH host key
 # ssh-keygen -A # `# SSH host keys  ` /etc/ssh/ssh_host_* \
