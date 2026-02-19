@@ -37,16 +37,16 @@ for pkg in "${_allowed_packages[@]}"; do
 done
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1 # mark all "auto" (can be removed)
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1   # mark each _preserve_package as manual (to be preserved)
-DEBIAN_FRONTEND=noninteractive apt-get -y autoremove --purge  # nuke everything that isn't marked as manual
-apt-get -y clean
+apt-get -y autoremove --purge; apt-get -y clean
 
 rm -rf \
     `# identity       ` /etc/hostname /etc/machine-id /var/lib/dbus/machine-id \
     `# apt sources    ` /etc/apt/sources.list /etc/apt/sources.list.d/* \
     `# apt cache      ` /var/lib/apt/lists/* \
     `# SSH host keys  ` /etc/ssh/ssh_host_* \
-    `# authorized_keys` /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys \
-    `# shell history  ` /root/.bash_history /home/*/.bash_history \
+    `# root home      ` /root/* /root/.[!.]* \
+    `# authorized_keys` /home/*/.ssh/authorized_keys \
+    `# shell history  ` /home/*/.bash_history \
     `# snap           ` /snap /var/snap /var/lib/snapd \
     `# logs and temp  ` /var/log/* /tmp/* /var/tmp/* \
     `# Providers:     ` \
@@ -78,6 +78,10 @@ rm -rf \
     `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
     `# Naver Cloud    ` /opt/ncloud /opt/nbp
 
+# Regenerate machine-id and SSH host keys
+systemd-machine-id-setup
+# ssh-keygen -A
+
 # Set timezone to UTC
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 echo "UTC" > /etc/timezone
@@ -89,10 +93,6 @@ cat > /etc/hosts <<EOF
 127.0.0.1   localhost
 ::1         localhost ip6-localhost ip6-loopback
 EOF
-
-# Regenerate machine-id and SSH host keys
-systemd-machine-id-setup
-ssh-keygen -A
 
 # Detect distro and write clean apt sources (deb822 format)
 . /etc/os-release
@@ -116,3 +116,8 @@ URIs: ${_security_uri}
 Suites: ${VERSION_CODENAME}-security
 Components: ${_components}
 EOF
+
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" dist-upgrade
+DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" autoremove --purge
+apt-get -y clean
