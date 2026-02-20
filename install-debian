@@ -125,7 +125,7 @@ rm -rf \
     `# users          ` /home \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
-    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
+    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /media \
     `# pam            ` /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
     `# snap           ` /snap /var/{snap,lib/snapd} \
@@ -166,9 +166,9 @@ rm -rf \
 
 
 # Remove users and groups now that packages (and their services) are purged
-_remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
+_remove_users=(_chrony debian Debian-exim polkitd systemd-timesync uuidd)
 _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
-_remove_groups=(crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
+_remove_groups=(_chrony crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
 for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
 for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
 
