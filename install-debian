@@ -41,11 +41,9 @@ Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 
 
+
 # Lock root account (no password, no direct login)
 passwd -l root
-
-# Remove non-root users created by cloud providers
-awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | xargs -r userdel -r
 
 # Disable and remove provider-created swap
 swapoff -a 2>/dev/null || true
@@ -67,7 +65,19 @@ cat > /etc/hosts <<EOF
 EOF
 
 
-# TODO: _required_packages; merged with _allowed. Required MUST be installed whereas allowed CAN be installed
+
+# Required packages MUST be installed; allowed packages CAN be installed (preserved if already present)
+_required_packages=(
+    # Init, system, package management
+    systemd systemd-sysv dbus udev apt dpkg dialog
+    # Base system
+    base-files base-passwd bash coreutils debianutils diffutils findutils
+    sudo grep gzip zstd login passwd sed tar util-linux htop less nano
+    # Networking & DHCP
+    iproute2 netbase ca-certificates curl wget socat traceroute iputils-ping
+    # SSH & cloud-init
+    openssh-server openssh-client cloud-init
+)
 _allowed_packages=(
     # Kernel & boot (Debian)
     linux-image-amd64 linux-image-cloud-amd64 linux-image-arm64 linux-image-cloud-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
@@ -75,25 +85,19 @@ _allowed_packages=(
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     # Kernel & boot (Ubuntu)
     linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
-    # Init, system, package management
-    systemd systemd-sysv dbus udev apt dpkg dialog
-    # Base system
-    base-files base-passwd bash coreutils debianutils diffutils findutils grep gzip zstd login passwd sed tar util-linux
-    # Networking & DHCP
-    iproute2 netbase ca-certificates curl dhcpcd-base dhcpcd5 ifupdown
-    # SSH & cloud-init
-    openssh-server openssh-client cloud-init
-    # Basics & distro-specific
-    sudo netplan.io systemd-resolved
+    # Networking & DHCP (provider-dependent)
+    dhcpcd-base dhcpcd5 ifupdown netplan.io systemd-resolved
 )
 
+# Update indices and install required packages
 DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
 
 # APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
 { dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 
-# Build the list of installed packages to preserve; nuke everything else
-_preserve_packages=()
+# Build the list of installed packages to preserve (required and allowed); nuke everything else
+_preserve_packages=("${_required_packages[@]}")
 for pkg in "${_allowed_packages[@]}"; do
     if dpkg-query -W -f='${Status}' "${pkg}" 2> /dev/null | grep -q "install ok installed"; then
         _preserve_packages+=("${pkg}")
@@ -110,6 +114,7 @@ rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/de
 DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
 
+
 # Remove stale Python bytecode
 find /usr/lib /var -name '*.pyc' -delete
 # Cleanup unused files, files that can be regenerated, or provider-specific files
@@ -120,7 +125,7 @@ rm -rf \
     `# users          ` /home/*/{.ssh/authorized_keys,.bash_history} \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume} \
-    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
+    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} \
     `# pam            ` /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
     `# snap           ` /snap /var/{snap,lib/snapd} \
@@ -132,7 +137,7 @@ rm -rf \
     `# Providers:     ` \
     `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
     `# Azure          ` /var/lib/waagent /etc/waagent.conf /{opt,var/opt,etc/opt}/microsoft /opt/omi \
-    `# GCP            ` /etc/default/instance_configs.cfg* /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google \
+    `# GCP            ` /etc/{default/instance_configs.cfg*,google_instance_id,boto.cfg} /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google* \
     `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
     `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
@@ -160,6 +165,14 @@ rm -rf \
 
 
 
+# Remove users and groups now that packages (and their services) are purged
+_remove_users=(Debian-exim polkitd systemd-timesync uuidd)
+_remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
+_remove_groups=(Debian-exim docker google-sudoers lxd polkitd systemd-timesync uuidd)
+for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -rf "${_u}" || true; done
+for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel    "${_g}" || true; done
+
+
 
 # FUTURE: the following is typical post-install done by other scripts (for snapshotting)
 
@@ -178,4 +191,4 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-# reboot
+reboot
