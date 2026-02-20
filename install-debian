@@ -166,9 +166,9 @@ rm -rf \
 
 
 # Remove users and groups now that packages (and their services) are purged
-_remove_users=(Debian-exim polkitd systemd-timesync uuidd)
+_remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
 _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
-_remove_groups=(crontab Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
+_remove_groups=(crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
 for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
 for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
 
