@@ -44,7 +44,7 @@ EOF
 
 
 # Lock root account (no password, no direct login)
-# passwd -l root
+passwd -l root
 
 # Disable and remove provider-created swap
 swapoff -a 2>/dev/null || true
@@ -135,6 +135,7 @@ rm -rf \
     `# snap           ` /snap /var/{snap,lib/snapd} \
     `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
     `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
+    `# root           ` /root/{*,.[!.]*} \
     `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
     `# swap           ` /swapfile \
     `# Providers:     ` \
@@ -187,10 +188,10 @@ DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade       -y -o Dpkg::Options::=
 DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
 apt-get clean -y
 
-# mkdir -p /root/.ssh/
-# cat > /root/.ssh/authorized_keys <<EOF
-# ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
-# EOF
-# chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
+mkdir -p /root/.ssh/
+cat > /root/.ssh/authorized_keys <<EOF
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
+EOF
+chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-# reboot
+reboot
