@@ -7,11 +7,12 @@ set -euo pipefail
 # Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages, repos, configs, and services, then strips
 # everything not in the whitelist.
 
+test -f /etc/os-release && . /etc/os-release || { echo "Error: /etc/os-release not found" >&2; exit 1; }
+[[ "${ID:-}" =~ ^(debian|ubuntu)$ ]] || { echo "Error: unsupported distro '${ID:-unknown}'" >&2; exit 1; }
 test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 
-# Detect distro and write clean apt sources (deb822 format)
-. /etc/os-release
+# Write clean apt sources (deb822 format)
 rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d} \
        /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
 case "${ID}" in
