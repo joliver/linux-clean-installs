@@ -13,7 +13,7 @@ test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
 
 # Write clean apt sources (deb822 format)
-rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d} \
+rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d/*} \
        /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
 case "${ID}" in
     debian)
@@ -44,7 +44,7 @@ EOF
 
 
 # Lock root account (no password, no direct login)
-passwd -l root
+# passwd -l root
 
 # Disable and remove provider-created swap
 swapoff -a 2>/dev/null || true
@@ -112,6 +112,7 @@ DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::=
 # Clear debconf database and normalize configs modified by cloud providers
 dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | DEBIAN_FRONTEND=noninteractive debconf-communicate {} > /dev/null'
 rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
+ucf --purge /etc/ssh/sshd_config; ucfr --purge openssh-server /etc/ssh/sshd_config # compatibility with Ubuntu 24.04 (not needed on Ubuntu 25.10 or Debian 13 or later)
 DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
 
@@ -134,7 +135,6 @@ rm -rf \
     `# snap           ` /snap /var/{snap,lib/snapd} \
     `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
     `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
-    `# root           ` /root/{*,.[!.]*} \
     `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
     `# swap           ` /swapfile \
     `# Providers:     ` \
@@ -183,14 +183,14 @@ for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && g
 # Regenerate SSH security keys
 
 DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite"
-DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade       -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
+DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
 apt-get clean -y
 
-mkdir -p /root/.ssh/
-cat > /root/.ssh/authorized_keys <<EOF
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
-EOF
-chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
+# mkdir -p /root/.ssh/
+# cat > /root/.ssh/authorized_keys <<EOF
+# ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
+# EOF
+# chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-reboot
+# reboot
