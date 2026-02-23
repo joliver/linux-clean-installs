@@ -108,6 +108,8 @@ done
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
 DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+# Purge packages left in 'rc' state (removed but config lingers) so dpkg cleans up statoverrides
+dpkg -l | awk '/^rc/ {print $2}' | xargs -r dpkg --purge
 
 # Clear debconf database and normalize configs modified by cloud providers
 dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | DEBIAN_FRONTEND=noninteractive debconf-communicate {} > /dev/null'
@@ -172,7 +174,7 @@ rm -rf \
 # Remove users and groups now that packages (and their services) are purged
 _remove_users=(_chrony debian Debian-exim polkitd systemd-timesync uuidd)
 _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
-_remove_groups=(_chrony crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
+_remove_groups=(admin _chrony crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
 for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
 for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
 
