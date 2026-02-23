@@ -90,9 +90,11 @@ _allowed_packages=(
     dhcpcd-base dhcpcd5 ifupdown netplan.io systemd-resolved
 )
 
+export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
+
 # Update indices and install required packages
-DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
+apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
 
 # APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
 { dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
@@ -107,15 +109,15 @@ done
 # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
 apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
 apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
 # Purge packages left in 'rc' state (removed but config lingers) so dpkg cleans up statoverrides
 dpkg -l | awk '/^rc/ {print $2}' | xargs -r dpkg --purge
 
 # Clear debconf database and normalize configs modified by cloud providers
-dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | DEBIAN_FRONTEND=noninteractive debconf-communicate {} > /dev/null'
+dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | debconf-communicate {} > /dev/null'
 rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
 ucf --purge /etc/ssh/sshd_config; ucfr --purge openssh-server /etc/ssh/sshd_config # compatibility with Ubuntu 24.04 (not needed on Ubuntu 25.10 or Debian 13 or later)
-DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
+apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
 
 
@@ -184,9 +186,9 @@ for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && g
 # systemd-machine-id-setup
 # Regenerate SSH security keys
 
-DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade       -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
-DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+apt-get dist-upgrade       -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
+apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
 apt-get clean -y
 
 mkdir -p /root/.ssh/
