@@ -131,7 +131,7 @@ rm -rf \
     `# users          ` /home \
     `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
     `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} \
-    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,multipath/bindings,pollinate} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
+    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
     `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common \
     `# pam            ` /etc/pam.d/*.pam-old \
     `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
