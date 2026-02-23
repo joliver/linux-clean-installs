@@ -73,7 +73,7 @@ _required_packages=(
     systemd systemd-sysv dbus udev apt dpkg dialog
     # Base system
     base-files base-passwd bash coreutils debianutils diffutils findutils
-    sudo grep gzip zstd login passwd sed tar util-linux htop less nano
+    sudo grep gzip zstd login passwd sed tar util-linux htop less nano locales
     # Networking & DHCP
     iproute2 netbase ca-certificates curl wget socat traceroute iputils-ping
     # SSH & cloud-init
