@@ -99,13 +99,15 @@ _apt_upgrade_kernel() {
     apt-get install -y "${_new_kernel_meta_package}"
     # TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
 
-    # APT's VersionedKernelPackages protects these from autoremove; mark all for purge — the new
-    # kernel's versioned packages are dependencies of the new metapackage and survive autoremove
-    _purge_packages+=( $(
+    # APT's VersionedKernelPackages protects versioned kernels from autoremove; purge explicitly
+    # Keep only the versioned kernel that the new metapackage depends on
+    _keep_kernel="$(apt-cache depends "${_new_kernel_meta_package}" 2>/dev/null | awk '/Depends:.*linux-image-[0-9]/ {print $2}')"
+    _old_kernel_packages=( $(
         dpkg -l "${_old_kernel_meta_package}" 2>/dev/null | awk '/^ii/ {print $2}'
-        { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
+        { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_keep_kernel}" || true
         { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
     ) )
+    test ${#_old_kernel_packages[@]} -gt 0 && apt-get purge -y "${_old_kernel_packages[@]}"
 }
 _apt_install_packages() {
     # Install required packages
