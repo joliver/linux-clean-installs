@@ -49,9 +49,9 @@ _required_packages=(
     systemd systemd-sysv dbus udev apt dpkg dialog
     # Base system
     base-files base-passwd bash coreutils debianutils diffutils findutils
-    sudo grep gzip zstd login passwd sed tar util-linux htop less nano locales
+    sudo grep gzip zstd login passwd sed tar util-linux less locales
     # Networking & DHCP
-    iproute2 netbase ca-certificates curl wget socat traceroute iputils-ping
+    iproute2 netbase ca-certificates curl iputils-ping
     # SSH & cloud-init
     openssh-server openssh-client cloud-init
 )
@@ -64,6 +64,8 @@ _allowed_packages=(
     linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
     # Networking & DHCP (provider-dependent)
     dhcpcd-base dhcpcd5 ifupdown netplan.io systemd-resolved
+    # Coreutils provider (Ubuntu 25.10+)
+    coreutils-from-gnu
 )
 
 export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
@@ -71,6 +73,8 @@ export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this fro
 # Update indices and install required packages
 apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
+# Swap to GNU coreutils if the split package exists (Ubuntu 25.10+)
+apt-cache show coreutils-from-gnu &>/dev/null && apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils- rust-coreutils-
 
 # APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
 _running_kernel_version="$(uname -r)"
@@ -201,4 +205,4 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-reboot
+#reboot
