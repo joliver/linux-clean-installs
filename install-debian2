@@ -97,7 +97,7 @@ _apt_upgrade_kernel() {
 
     _required_packages+=("${_new_kernel_meta_package}")
     apt-get install -y "${_new_kernel_meta_package}"
-    # TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
+    # TODO: remove after testing across multiple cloud providers; if a provider doesn't boot into the new kernel, run: grub-mkconfig -o /boot/grub/grub.cfg
 
     # APT's VersionedKernelPackages protects versioned kernels from autoremove; purge explicitly
     # Keep only the versioned kernel that the new metapackage depends on
