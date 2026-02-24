@@ -107,7 +107,9 @@ _apt_upgrade_kernel() {
         { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_keep_kernel}" || true
         { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
     ) )
-    test ${#_old_kernel_packages[@]} -gt 0 && apt-get purge -y "${_old_kernel_packages[@]}"
+
+    # even while the instance is still running, remove old kernels, if any
+    test ${#_old_kernel_packages[@]} -gt 0 && apt-get purge -y "${_old_kernel_packages[@]}" || true
 }
 _apt_install_packages() {
     # Install required packages
