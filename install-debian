@@ -7,41 +7,28 @@ set -euo pipefail
 # Tencent Cloud, Baidu Cloud, and Naver Cloud specific packages, repos, configs, and services, then strips
 # everything not in the whitelist.
 
+test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 test -f /etc/os-release && . /etc/os-release || { echo "Error: /etc/os-release not found" >&2; exit 1; }
 [[ "${ID:-}" =~ ^(debian|ubuntu)$ ]] || { echo "Error: unsupported distro '${ID:-unknown}'" >&2; exit 1; }
-test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
 
+_main() {
+    _write_apt_sources
+    _install_packages_required
+    _install_packages_use_gnu_coreutils
+    _install_packages_update_kernel
+    _install_packages_prune_old_kernels_headers_and_tools
 
-# Write clean apt sources (deb822 format)
-rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d/*} \
-       /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
-case "${ID}" in
-    debian)
-        _repo_uri="http://deb.debian.org/debian"
-        _security_uri="http://deb.debian.org/debian-security"
-        _components="main"
-        ;;
-    ubuntu)
-        _repo_uri="http://archive.ubuntu.com/ubuntu"
-        _security_uri="http://security.ubuntu.com/ubuntu"
-        _components="main restricted universe"
-        ;;
-esac
-cat > "/etc/apt/sources.list.d/${ID}.sources" <<EOF
-Types: deb
-URIs: ${_repo_uri}
-Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
-Components: ${_components}
-Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
+    _purge_unused_packages
+    _restore_factory_configuration
+    _remove_users_and_groups_from_purged_packages
 
-Types: deb
-URIs: ${_security_uri}
-Suites: ${VERSION_CODENAME}-security
-Components: ${_components}
-Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
-EOF
+    _remove_unused_package_files
+    _remove_provider_specific_files
 
+    _finalize
+}
 
+export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
 
 # Required packages MUST be installed; allowed packages CAN be installed (preserved if already present)
 _required_packages=(
@@ -68,156 +55,199 @@ _allowed_packages=(
     coreutils-from-gnu
 )
 
-export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
+_write_apt_sources() {
+    rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d/*} \
+           /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
 
-# Update indices and install required packages
-apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
-# Swap to GNU coreutils if the split package exists (Ubuntu 25.10+)
-apt-cache show coreutils-from-gnu &>/dev/null && apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils- rust-coreutils-
-# Swap to minimal cloud/virtual kernel; remove the heavier variant if present
-_arch="$(dpkg --print-architecture)"
-case "${ID}" in
-    debian)
-        apt-get install -y "linux-image-cloud-${_arch}"
-        dpkg -l "linux-image-${_arch}" 2>/dev/null | grep -q '^ii' && apt-get purge -y "linux-image-${_arch}"
-        ;;
-    ubuntu)
-        apt-get install -y linux-image-virtual
-        dpkg -l linux-image-generic 2>/dev/null | grep -q '^ii' && apt-get purge -y linux-image-generic
-        ;;
-esac
+    case "${ID}" in
+        debian)
+            _repo_uri="http://deb.debian.org/debian"
+            _security_uri="http://deb.debian.org/debian-security"
+            _components="main"
+            ;;
+        ubuntu)
+            _repo_uri="http://archive.ubuntu.com/ubuntu"
+            _security_uri="http://security.ubuntu.com/ubuntu"
+            _components="main restricted universe"
+            ;;
+    esac
+    cat > "/etc/apt/sources.list.d/${ID}.sources" <<EOF
+Types: deb
+URIs: ${_repo_uri}
+Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates
+Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 
-# APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
-_running_kernel_version="$(uname -r)"
-_newest_kernel_package="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
-{ dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_newest_kernel_package}" | xargs -r apt-get purge -y || true
-# Purge linux-headers and linux-tools unconditionally (not in the whitelist)
-{ dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
+Types: deb
+URIs: ${_security_uri}
+Suites: ${VERSION_CODENAME}-security
+Components: ${_components}
+Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
+EOF
+}
 
-# Build the list of installed packages to preserve (required and allowed); nuke everything else
-_preserve_packages=("${_required_packages[@]}")
-for pkg in "${_allowed_packages[@]}"; do
-    if dpkg-query -W -f='${Status}' "${pkg}" 2> /dev/null | grep -q "install ok installed"; then
-        _preserve_packages+=("${pkg}")
-    fi
-done
-# Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
-apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
-apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
-apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
-# Purge packages left in 'rc' state (removed but config lingers) so dpkg cleans up statoverrides
-dpkg -l | awk '/^rc/ {print $2}' | xargs -r dpkg --purge
+_install_packages_required() {
+    # Update indices and install required packages
+    apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
+}
+_install_packages_use_gnu_coreutils() {
+    # Swap to GNU coreutils if the split package exists (Ubuntu 25.10+)
+    apt-cache show coreutils-from-gnu &>/dev/null && apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils- rust-coreutils-
+}
+_install_packages_update_kernel() {
+    # TODO: what about on baremetal?
+    # Swap to minimal cloud/virtual kernel; remove the heavier variant if present
+    _arch="$(dpkg --print-architecture)"
+    case "${ID}" in
+        debian)
+            apt-get install -y "linux-image-cloud-${_arch}"
+            dpkg -l "linux-image-${_arch}" 2>/dev/null | grep -q '^ii' && apt-get purge -y "linux-image-${_arch}"
+            ;;
+        ubuntu)
+            apt-get install -y linux-image-virtual
+            dpkg -l linux-image-generic 2>/dev/null | grep -q '^ii' && apt-get purge -y linux-image-generic
+            ;;
+    esac
 
-# Clear debconf database and normalize configs modified by cloud providers
-dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | debconf-communicate {} > /dev/null'
-rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
-ucf --purge /etc/ssh/sshd_config; ucfr --purge openssh-server /etc/ssh/sshd_config # compatibility with Ubuntu 24.04 (not needed on Ubuntu 25.10 or Debian 13 or later)
-apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
+}
+_install_packages_prune_old_kernels_headers_and_tools() {
+    # APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
+    _running_kernel_version="$(uname -r)"
+    _newest_kernel_package="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
+    { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_newest_kernel_package}" | xargs -r apt-get purge -y || true
+    # Purge linux-headers and linux-tools unconditionally (not in the whitelist)
+    { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
+}
 
+_purge_unused_packages() {
+    # Build the list of installed packages to preserve (required and allowed); nuke everything else
+    _preserve_packages=("${_required_packages[@]}")
+    for pkg in "${_allowed_packages[@]}"; do
+        if dpkg-query -W -f='${Status}' "${pkg}" 2> /dev/null | grep -q "install ok installed"; then
+            _preserve_packages+=("${pkg}")
+        fi
+    done
+    # Mark all as auto (can be removed), then mark keepers as manual (to be preserved)
+    apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
+    apt-mark manual "${_preserve_packages[@]}" > /dev/null 2>&1
+    apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+    # Purge packages left in 'rc' state (removed but config lingers) so dpkg cleans up statoverrides
+    dpkg -l | awk '/^rc/ {print $2}' | xargs -r dpkg --purge
+}
 
+_restore_factory_configuration() {
+    # Clear debconf database and factory-reset configs modified by cloud providers
+    dpkg-query -W -f='${Package}\n' | xargs -I{} /usr/bin/bash -c 'echo PURGE | debconf-communicate {} > /dev/null'
+    rm -f /etc/apt/apt.conf.d/* /etc/ssh/sshd_config /etc/skel/.bashrc /var/cache/debconf/{config,templates}.dat-old /var/cache/debconf/passwords.dat
+    ucf --purge /etc/ssh/sshd_config; ucfr --purge openssh-server /etc/ssh/sshd_config # compatibility with Ubuntu 24.04 (not needed on Ubuntu 25.10 or Debian 13 or later)
+    apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" openssh-server libpam-runtime apt bash ca-certificates
 
-# Lock root account (no password, no direct login)
-passwd -l root
+    # Get rid of garbage in grub file, if any
+    test -f /etc/default/grub && sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
 
-# Disable and remove provider-created swap
-swapoff -a 2>/dev/null || true
-sed -i '/swap/d' /etc/fstab
+    # Lock root account (no password, no direct login)
+    passwd -l root
 
-# Get rid of garbage in grub file, if any
-test -f /etc/default/grub && sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
+    # Disable and remove provider-created swap
+    swapoff -a 2>/dev/null || true
+    sed -i '/swap/d' /etc/fstab
 
-# Set locale and timezone
-echo 'LANG=en_US.UTF-8'  > /etc/locale.conf
-echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen; locale-gen &>/dev/null || true
-ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-echo "UTC" > /etc/timezone
+    # Set locale and timezone
+    echo 'LANG=en_US.UTF-8'  > /etc/locale.conf
+    echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen; locale-gen &>/dev/null || true
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    echo "UTC" > /etc/timezone
 
-# Reset hosts file
-cat > /etc/hosts <<EOF
+    # Reset hosts file
+    cat > /etc/hosts <<EOF
 127.0.0.1   localhost
 ::1         localhost ip6-localhost ip6-loopback
 EOF
+}
+_remove_users_and_groups_from_purged_packages() {
+    # Remove users and groups now that packages (and their services) are purged
+    _remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
+    _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
+    _remove_groups=(admin crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
+    for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
+    for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
+}
 
+_remove_unused_package_files() {
+    find /usr/lib /var -name '*.pyc' -delete # Remove stale Python bytecode
+    rm -rf \
+        `# identity       ` /etc/{hostname,adjtime,aliases,mailname,cloud-release} \
+        `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
+        `# crypt tab      ` /etc/crypttab \
+        `# users          ` /home \
+        `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
+        `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} \
+        `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
+        `# pam            ` /etc/pam.d/*.pam-old \
+        `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
+        `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
+        `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
+        `# root           ` /root/{*,.[!.]*} \
+        `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
+        `# swap           ` /swapfile
 
+    # Ubuntu-specific cleanup
+    rm -rf \
+        `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common \
+        `# snap           ` /snap /var/{snap,lib/snapd}
+}
+_remove_provider_specific_files() {
+    rm -rf \
+        `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
+        `# Azure          ` /var/lib/waagent /etc/waagent.conf /{opt,var/opt,etc/opt}/microsoft /opt/omi \
+        `# GCP            ` /etc/{default/instance_configs.cfg*,google_instance_id,boto.cfg} /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google* \
+        `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
+        `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
+        `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
+        `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service /etc/{ec2_version,overlayroot.local.conf} \
+        `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} \
+        `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
+        `# Equinix Metal  ` /{opt,etc}/packet \
+        `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
+        `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
+        `# Ionos          ` /{etc,opt}/ionos \
+        `# Scaleway       ` /{etc,opt}/scaleway /usr/local/sbin/scw-* \
+        `# Yandex Cloud   ` /{opt,etc}/yandex \
+        `# UpCloud        ` /{etc,opt}/upcloud \
+        `# Exoscale       ` /{etc,opt}/exoscale \
+        `# Leaseweb       ` /opt/leaseweb \
+        `# Selectel       ` /opt/selectel \
+        `# Gcore          ` /{etc,opt}/gcore \
+        `# Civo           ` /{etc,opt}/civo \
+        `# Cherry Servers ` /{etc,opt}/cherry \
+        `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/{cloudmonitor,share/aliyun-assist,share/assist-daemon} \
+        `# Huawei Cloud   ` /usr/local/hostguard /opt/huawei \
+        `# Tencent Cloud  ` /usr/local/{qcloud,tat-agent,barad,sgagent,YDLive} /var/lib/qcloud \
+        `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
+        `# Naver Cloud    ` /opt/{ncloud,nbp}
+}
 
-# Remove stale Python bytecode
-find /usr/lib /var -name '*.pyc' -delete
-# Cleanup unused files, files that can be regenerated, or provider-specific files
-rm -rf \
-    `# identity       ` /etc/{hostname,adjtime,aliases,mailname,cloud-release} \
-    `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
-    `# crypt tab      ` /etc/crypttab \
-    `# users          ` /home \
-    `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
-    `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} \
-    `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
-    `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common \
-    `# pam            ` /etc/pam.d/*.pam-old \
-    `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
-    `# snap           ` /snap /var/{snap,lib/snapd} \
-    `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
-    `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
-    `# root           ` /root/{*,.[!.]*} \
-    `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
-    `# swap           ` /swapfile \
-    `# Providers:     ` \
-    `# AWS            ` /opt/aws /etc/amazon /var/lib/amazon /usr/share/ec2-instance-connect \
-    `# Azure          ` /var/lib/waagent /etc/waagent.conf /{opt,var/opt,etc/opt}/microsoft /opt/omi \
-    `# GCP            ` /etc/{default/instance_configs.cfg*,google_instance_id,boto.cfg} /usr/bin/google_* /usr/share/google-guest-agent /var/lib/google* \
-    `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
-    `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
-    `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
-    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service /etc/{ec2_version,overlayroot.local.conf} \
-    `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} \
-    `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
-    `# Equinix Metal  ` /{opt,etc}/packet \
-    `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
-    `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
-    `# Ionos          ` /{etc,opt}/ionos \
-    `# Scaleway       ` /{etc,opt}/scaleway /usr/local/sbin/scw-* \
-    `# Yandex Cloud   ` /{opt,etc}/yandex \
-    `# UpCloud        ` /{etc,opt}/upcloud \
-    `# Exoscale       ` /{etc,opt}/exoscale \
-    `# Leaseweb       ` /opt/leaseweb \
-    `# Selectel       ` /opt/selectel \
-    `# Gcore          ` /{etc,opt}/gcore \
-    `# Civo           ` /{etc,opt}/civo \
-    `# Cherry Servers ` /{etc,opt}/cherry \
-    `# Alibaba Cloud  ` /usr/local/aegis /usr/sbin/aliyun* /etc/aliyun* /opt/Chinese /usr/local/{cloudmonitor,share/aliyun-assist,share/assist-daemon} \
-    `# Huawei Cloud   ` /usr/local/hostguard /opt/huawei \
-    `# Tencent Cloud  ` /usr/local/{qcloud,tat-agent,barad,sgagent,YDLive} /var/lib/qcloud \
-    `# Baidu Cloud    ` /usr/local/bce /opt/hosteye \
-    `# Naver Cloud    ` /opt/{ncloud,nbp}
+_finalize() {
+    # FUTURE: the following is typical post-install done by other scripts (for snapshotting)
+    # Regenerate machine-id
+    # systemd-machine-id-setup
+    # Regenerate SSH security keys
 
+    apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
+    apt-get dist-upgrade       -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
+    apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
+    apt-get clean -y
 
-
-# Remove users and groups now that packages (and their services) are purged
-_remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
-_remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
-_remove_groups=(admin crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
-for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
-for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
-
-
-# FUTURE: the following is typical post-install done by other scripts (for snapshotting)
-
-# Regenerate machine-id
-# systemd-machine-id-setup
-# Regenerate SSH security keys
-
-apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
-apt-get dist-upgrade       -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
-apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
-apt-get clean -y
-
-mkdir -p /root/.ssh/
-cat > /root/.ssh/authorized_keys <<EOF
+    mkdir -p /root/.ssh/
+    cat > /root/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
 EOF
-chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
+    chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
 
-# TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need
-# to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
+    # TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need
+    # to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
+}
 
-#reboot
+_main
+# reboot
