@@ -119,8 +119,8 @@ _install_packages_prune_kernels() {
     # APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
     # Purge linux-headers and linux-tools unconditionally (not in the whitelist)
     _running_kernel_version="$(uname -r)"
-    _current_kernel_version="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
-    { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_current_kernel_version}" | xargs -r apt-get purge -y || true
+    _installed_kernel_version="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
+    { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_installed_kernel_version}" | xargs -r apt-get purge -y || true
     { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 }
 
