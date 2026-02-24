@@ -58,7 +58,7 @@ _required_packages=(
 _allowed_packages=(
     # Kernel & boot (Debian)
     linux-image-amd64 linux-image-cloud-amd64 linux-image-arm64 linux-image-cloud-arm64 linux-image-686-pae linux-image-686 linux-image-armmp linux-image-armmp-lpae linux-image-powerpc64le linux-image-s390x linux-image-riscv64
-    amd64-microcode intel-microcode
+    amd64-microcode intel-microcode # only needed on bare metal; removing these also drops linux-firmware
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     # Kernel & boot (Ubuntu)
     linux-image-virtual grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
@@ -75,6 +75,18 @@ apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
 # Swap to GNU coreutils if the split package exists (Ubuntu 25.10+)
 apt-cache show coreutils-from-gnu &>/dev/null && apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils- rust-coreutils-
+# Swap to minimal cloud/virtual kernel; remove the heavier variant if present
+_arch="$(dpkg --print-architecture)"
+case "${ID}" in
+    debian)
+        apt-get install -y "linux-image-cloud-${_arch}"
+        dpkg -l "linux-image-${_arch}" 2>/dev/null | grep -q '^ii' && apt-get purge -y "linux-image-${_arch}"
+        ;;
+    ubuntu)
+        apt-get install -y linux-image-virtual
+        dpkg -l linux-image-generic 2>/dev/null | grep -q '^ii' && apt-get purge -y linux-image-generic
+        ;;
+esac
 
 # APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
 _running_kernel_version="$(uname -r)"
@@ -204,5 +216,8 @@ cat > /root/.ssh/authorized_keys <<EOF
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZoWV3jeaTVhwJhtXGkpcns8v/NNFvTOfEoUY6EzJ/D jonathan-oliver
 EOF
 chmod 0700 /root/.ssh && chmod 0600 /root/.ssh/authorized_keys
+
+# TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need
+# to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
 
 #reboot
