@@ -168,8 +168,8 @@ rm -rf \
     `# IBM Cloud      ` /opt/{IBM,bnpp,BUAgent,draios} \
     `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
     `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
-    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service \
-    `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*} \
+    `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service /etc/{ec2_version,overlayroot.local.conf} \
+    `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} \
     `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
     `# Equinix Metal  ` /{opt,etc}/packet \
     `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
