@@ -95,15 +95,15 @@ _apt_upgrade_kernel() {
     _new_kernel_meta_package="$(systemd-detect-virt --vm -q && echo "${_virt_kernel}" || echo "${_bare_kernel}")"
     _old_kernel_meta_package="$(systemd-detect-virt --vm -q && echo "${_bare_kernel}" || echo "${_virt_kernel}")"
 
-    _purge_packages+=( $(dpkg -l "${_old_kernel_meta_package}" 2>/dev/null | awk '/^ii/ {print $2}') )
+    _required_packages+=("${_new_kernel_meta_package}")
     apt-get install -y "${_new_kernel_meta_package}"
     # TODO: if Debian 13 doesn't boot into the new cloud kernel after reboot, GRUB may need to be regenerated manually: grub-mkconfig -o /boot/grub/grub.cfg
 
-    # APT's VersionedKernelPackages protects these from autoremove; old ones explicitly add to the purge list
-    _running_kernel_version="$(uname -r)"
-    _installed_kernel_version="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
+    # APT's VersionedKernelPackages protects these from autoremove; mark all for purge — the new
+    # kernel's versioned packages are dependencies of the new metapackage and survive autoremove
     _purge_packages+=( $(
-        { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_installed_kernel_version}" || true
+        dpkg -l "${_old_kernel_meta_package}" 2>/dev/null | awk '/^ii/ {print $2}'
+        { dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
         { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
     ) )
 }
