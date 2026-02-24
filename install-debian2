@@ -8,7 +8,7 @@ set -euo pipefail
 # everything not in the whitelist.
 
 test "${EUID}" -eq 0 || { echo "Error: must run as root" >&2; exit 1; }
-test -f /etc/os-release && . /etc/os-release || { echo "Error: /etc/os-release not found" >&2; exit 1; }
+test -f /etc/os-release && . /etc/os-release || { echo "Error: /etc/os-release not found or not valid" >&2; exit 1; }
 [[ "${ID:-}" =~ ^(debian|ubuntu)$ ]] || { echo "Error: unsupported distro '${ID:-unknown}'" >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
 
@@ -186,7 +186,7 @@ _clean_system_files() {
         `# users          ` /home \
         `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
         `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} \
-        `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
+        `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,ssh/sshd_config.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,ldap,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
         `# pam            ` /etc/pam.d/*.pam-old \
         `# debconf        ` /var/cache/debconf/*.dat-old \
         `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
