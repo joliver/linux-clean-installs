@@ -72,8 +72,12 @@ export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this fro
 apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" "${_required_packages[@]}"
 
-# APT's VersionedKernelPackages protects linux-headers from autoremove; purge explicitly
-{ dpkg -l 'linux-headers-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
+# APT's VersionedKernelPackages protects these from autoremove; purge old ones explicitly
+_running_kernel_version="$(uname -r)"
+_newest_kernel_package="$(dpkg -l 'linux-image-[0-9]*' 2>/dev/null | awk '/^ii/ {print $2}' | sort -V | tail -1)"
+{ dpkg -l 'linux-image-[0-9]*' 'linux-modules-[0-9]*' 'linux-modules-extra-[0-9]*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | grep -v "${_running_kernel_version}" | grep -v "${_newest_kernel_package}" | xargs -r apt-get purge -y || true
+# Purge linux-headers and linux-tools unconditionally (not in the whitelist)
+{ dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}' | xargs -r apt-get purge -y
 
 # Build the list of installed packages to preserve (required and allowed); nuke everything else
 _preserve_packages=("${_required_packages[@]}")
