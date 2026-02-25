@@ -21,8 +21,8 @@ _main() {
     _apt_purge_packages
     _apt_reconfigure
 
-    _configure_system
     _prune_users_and_groups
+    _configure_system
     _clean_system_files
     _clean_provider_files
     _ssh_access
@@ -144,7 +144,14 @@ _apt_reconfigure() {
 
     apt-get install --reinstall -y -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-confnew" "${_reconfigure_packages[@]}"
 }
-
+_prune_users_and_groups() {
+    # Remove users and groups now that packages (and their services) are purged
+    _remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
+    _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
+    _remove_groups=(admin crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
+    for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
+    for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
+}
 _configure_system() {
     # Get rid of garbage in grub file, if any
     test -f /etc/default/grub && sed -i 's/ PACKER_SSHPUBKEY=[^ ]*//' /etc/default/grub
@@ -165,15 +172,6 @@ _configure_system() {
     # Reset hosts file
     echo -e "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback" > /etc/hosts
 }
-_prune_users_and_groups() {
-    # Remove users and groups now that packages (and their services) are purged
-    _remove_users=(debian Debian-exim polkitd systemd-timesync uuidd)
-    _remove_users+=($(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd))
-    _remove_groups=(admin crontab debian Debian-exim docker google-sudoers lxd netdev polkitd systemd-timesync uuidd)
-    for _u in "${_remove_users[@]}";  do getent passwd "${_u}" > /dev/null 2>&1 && userdel -f "${_u}" || true; done
-    for _g in "${_remove_groups[@]}"; do getent group  "${_g}" > /dev/null 2>&1 && groupdel   "${_g}" || true; done
-}
-
 _clean_system_files() {
     find /usr/lib /var -type f -name '*.pyc' -delete # Remove stale Python bytecode
     rm -rf \
