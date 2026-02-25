@@ -163,10 +163,7 @@ _configure_system() {
     echo "UTC" > /etc/timezone
 
     # Reset hosts file
-    cat > /etc/hosts <<EOF
-127.0.0.1   localhost
-::1         localhost ip6-localhost ip6-loopback
-EOF
+    echo -e "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback" > /etc/hosts
 }
 _prune_users_and_groups() {
     # Remove users and groups now that packages (and their services) are purged
