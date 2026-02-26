@@ -49,9 +49,9 @@ _allowed_packages=(
     # Coreutils provider (Ubuntu 25.10+)
     coreutils-from-gnu
 )
+_purge_packages=( cloud-init lsb-base )
 _reconfigure_packages=( openssh-server libpam-runtime apt bash ca-certificates )
 _reconfigure_files=( '/etc/apt/apt.conf.d/*' /etc/skel/.bashrc /etc/ssh/sshd_config )
-_purge_packages=()
 
 _apt_sources() {
     rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d/*} \
@@ -184,9 +184,10 @@ _clean_system_files() {
         `# identity       ` /etc/{hostname,adjtime,aliases,mailname,cloud-release} \
         `# user backups   ` /etc/{passwd,group,shadow,gshadow,subuid,subgid}- \
         `# crypt tab      ` /etc/crypttab \
+        `# cloud-init     ` /etc/{cloud,sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} /var/lib/cloud /usr/lib/python3{,/dist-packages/cloudinit} \
         `# users          ` /home \
         `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
-        `# cloud-init     ` /etc/{sudoers.d/*,ssh/sshd_config.d/*,skel/.cloud-locale-test.skip,initramfs-tools/conf.d/resume,cloud/clean.d/99-installer} \
+        `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,ssh/sshd_config.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,ldap,multipath,pollinate,xml,sgml} /usr/{share/dict/common.*,lib/firmware/regulatory.db{,.p7s},lib/python3/dist-packages/{dbus,gi,pygtkcompat}} /var/{lib/{dhcp,libuuid},crash} /media \
         `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,ssh/sshd_config.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,ldap,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
         `# pam            ` /etc/pam.d/*.pam-old \
         `# debconf        ` /var/cache/debconf/*.dat-old \
