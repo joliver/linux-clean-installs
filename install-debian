@@ -82,7 +82,7 @@ _apt_upgrade() {
 }
 _apt_ensure_gnu_coreutils() {
     dpkg -l rust-coreutils 2>/dev/null | grep -q '^ii' || return 0
-    apt-get install coreutils-from-gnu coreutils-from-uutils- --allow-remove-essential
+    apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils-
 }
 _apt_upgrade_kernel() {
     # Select proper kernel metapackage: cloud/virtual for VMs, generic for bare metal
@@ -90,7 +90,8 @@ _apt_upgrade_kernel() {
     _is_vm=false; systemd-detect-virt --vm -q && _is_vm=true
 
     # Microcode not allowed on VMs
-    _microcode=(amd64-microcode intel-microcode iucode-tool linux-firmware)
+    _microcode=(amd64-microcode intel-microcode iucode-tool)
+    test "${ID}" = "ubuntu" && _microcode+=(linux-firmware)
     "${_is_vm}" && _purge_packages+=("${_microcode[@]}") || _allowed_packages+=("${_microcode[@]}")
 
     _virt_kernel=linux-image-virtual; test "${ID}" = "debian" && _virt_kernel="linux-image-cloud-${_cpu_architecture}"
