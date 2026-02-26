@@ -89,7 +89,9 @@ _apt_upgrade_kernel() {
     _cpu_architecture="$(dpkg --print-architecture)"
     _is_vm=false; systemd-detect-virt --vm -q && _is_vm=true
 
-    "${_is_vm}" || _allowed_packages+=(amd64-microcode intel-microcode iucode-tool linux-firmware) # microcode only on baremetal
+    # Remove microcode from VMs but allow it to remain on bare metal
+    _microcode=(amd64-microcode intel-microcode iucode-tool linux-firmware)
+    "${_is_vm}" && _purge_packages+=("${_microcode[@]}") || _allowed_packages+=("${_microcode[@]}")
 
     _virt_kernel=linux-image-virtual; test "${ID}" = "debian" && _virt_kernel="linux-image-cloud-${_cpu_architecture}"
     _bare_kernel=linux-image-generic; test "${ID}" = "debian" && _bare_kernel="linux-image-${_cpu_architecture}"
@@ -236,4 +238,4 @@ _ssh_access() {
 }
 
 _main
-reboot
+#reboot
