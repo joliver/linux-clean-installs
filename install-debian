@@ -55,6 +55,7 @@ _reconfigure_packages=( openssh-server libpam-runtime apt bash ca-certificates )
 _reconfigure_files=( '/etc/apt/apt.conf.d/*' /etc/skel/.bashrc /etc/ssh/sshd_config )
 
 _dpkg_excludes() {
+    mkdir -p /etc/dpkg/dpkg.cfg.d/
     cat > /etc/dpkg/dpkg.cfg.d/excludes <<EOF
 path-exclude=/usr/share/man/*
 path-exclude=/usr/share/locale/*/LC_MESSAGES/*.mo
