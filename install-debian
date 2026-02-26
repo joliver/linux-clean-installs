@@ -199,7 +199,7 @@ _clean_system_files() {
 
     # Ubuntu-specific cleanup
     rm -rf \
-        `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common \
+        `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common /usr/share/keyrings/ubuntu-cloudimage-keyring*.gpg \
         `# snap           ` /snap /var/{snap,lib/snapd}
 }
 _clean_provider_files() {
@@ -212,7 +212,7 @@ _clean_provider_files() {
         `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
         `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service /etc/{ec2_version,overlayroot.local.conf} /etc/systemd/{resolved.conf.d/DigitalOcean.conf,networkd.conf.d/50-cloudimg-settings.conf} \
         `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} /usr/lib/modules/grub-*-linode.img/ \
-        `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
+        `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service /etc/systemd/system/multi-user.target.wants/cloud-init-log-reader.service \
         `# Equinix Metal  ` /{opt,etc}/packet \
         `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
         `# Hetzner        ` /etc/{hc-utils,hetzner-build} \
