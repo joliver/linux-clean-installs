@@ -76,7 +76,7 @@ Signed-By: /usr/share/keyrings/${ID}-archive-keyring.gpg
 EOF
 }
 _apt_upgrade() {
-    # point to official sources and upgrade everything first so we don't get version conflicts (Vultr, Linode had custom versions)
+    # Avoiding version conflicts by updating from official sources rather than provider-specific sources.
     apt-get update -o Acquire::PDiffs=false -o Acquire::Languages=none
     apt-get dist-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o Dpkg::Options::="--force-confmiss" -o Dpkg::Options::="--force-overwrite"
 }
@@ -89,7 +89,7 @@ _apt_upgrade_kernel() {
     _cpu_architecture="$(dpkg --print-architecture)"
     _is_vm=false; systemd-detect-virt --vm -q && _is_vm=true
 
-    # Remove microcode from VMs but allow it to remain on bare metal
+    # Microcode not allowed on VMs
     _microcode=(amd64-microcode intel-microcode iucode-tool linux-firmware)
     "${_is_vm}" && _purge_packages+=("${_microcode[@]}") || _allowed_packages+=("${_microcode[@]}")
 
@@ -109,7 +109,7 @@ _apt_upgrade_kernel() {
         { dpkg -l 'linux-headers-*' 'linux-tools-*' 2>/dev/null || true; } | awk '/^ii/ {print $2}'
     ) )
 
-    # even while the instance is still running, remove old kernels, if any
+    # Remove old kernel from running system
     test ${#_old_kernel_packages[@]} -gt 0 && apt-get purge -y "${_old_kernel_packages[@]}" || true
 }
 _apt_install_packages() {
