@@ -42,7 +42,6 @@ _required_packages=(
 )
 _allowed_packages=(
     # Kernel & boot
-    amd64-microcode intel-microcode # only needed on bare metal; removing these also drops linux-firmware
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
     # Networking & DHCP (provider-dependent)
@@ -88,15 +87,16 @@ _apt_ensure_gnu_coreutils() {
 _apt_upgrade_kernel() {
     # Select proper kernel metapackage: cloud/virtual for VMs, generic for bare metal
     _cpu_architecture="$(dpkg --print-architecture)"
+    _is_vm=false; systemd-detect-virt --vm -q && _is_vm=true
+
+    "${_is_vm}" || _allowed_packages+=(amd64-microcode intel-microcode iucode-tool linux-firmware) # microcode only on baremetal
 
     _virt_kernel=linux-image-virtual; test "${ID}" = "debian" && _virt_kernel="linux-image-cloud-${_cpu_architecture}"
     _bare_kernel=linux-image-generic; test "${ID}" = "debian" && _bare_kernel="linux-image-${_cpu_architecture}"
-    _new_kernel_meta_package="$(systemd-detect-virt --vm -q && echo "${_virt_kernel}" || echo "${_bare_kernel}")"
-    _old_kernel_meta_package="$(systemd-detect-virt --vm -q && echo "${_bare_kernel}" || echo "${_virt_kernel}")"
-
+    _new_kernel_meta_package="$("${_is_vm}" && echo "${_virt_kernel}" || echo "${_bare_kernel}")"
+    _old_kernel_meta_package="$("${_is_vm}" && echo "${_bare_kernel}" || echo "${_virt_kernel}")"
     _required_packages+=("${_new_kernel_meta_package}")
     apt-get install -y "${_new_kernel_meta_package}"
-    # TODO: remove after testing across multiple cloud providers; if a provider doesn't boot into the new kernel, run: grub-mkconfig -o /boot/grub/grub.cfg
 
     # APT's VersionedKernelPackages protects versioned kernels from autoremove; purge explicitly
     # Keep only the versioned kernel that the new metapackage depends on
