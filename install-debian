@@ -199,7 +199,7 @@ _clean_system_files() {
 
     # Ubuntu-specific cleanup
     rm -rf \
-        `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common /usr/share/keyrings/ubuntu-cloudimage-keyring*.gpg \
+        `# ubuntu         ` /etc/apt/preferences.d.save /var/lib/ubuntu-drivers-common /usr/share/keyrings/ubuntu-cloudimage-{keyring*,removed-keys}.gpg \
         `# snap           ` /snap /var/{snap,lib/snapd}
 }
 _clean_provider_files() {
