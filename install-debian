@@ -13,6 +13,7 @@ test -f /etc/os-release && . /etc/os-release || { echo "Error: /etc/os-release n
 export DEBIAN_FRONTEND=noninteractive # all apt-get operations will use this from this point forward
 
 _main() {
+    _dpkg_excludes
     _apt_sources
     _apt_upgrade
     _apt_ensure_gnu_coreutils
@@ -53,6 +54,15 @@ _purge_packages=( cloud-init lsb-base )
 _reconfigure_packages=( openssh-server libpam-runtime apt bash ca-certificates )
 _reconfigure_files=( '/etc/apt/apt.conf.d/*' /etc/skel/.bashrc /etc/ssh/sshd_config )
 
+_dpkg_excludes() {
+    cat > /etc/dpkg/dpkg.cfg.d/excludes <<EOF
+path-exclude=/usr/share/man/*
+path-exclude=/usr/share/locale/*/LC_MESSAGES/*.mo
+path-exclude=/usr/share/doc/*
+path-include=/usr/share/doc/*/copyright
+path-include=/usr/share/doc/*/changelog.*
+EOF
+}
 _apt_sources() {
     rm -rf /etc/apt/{sources.list,sources.list~,sources.list.d/*,mirrors,preferences.d/*} \
            /var/lib/apt/{lists/*,periodic/*,cdroms.list*,daily_lock}
