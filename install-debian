@@ -176,6 +176,10 @@ _configure_system() {
     # Lock root account (no password, no direct login)
     passwd -l root
 
+    # Disable virtual console (unused on headless cloud VMs)
+    systemctl disable --now getty@tty1.service 2>/dev/null
+    systemctl mask getty@tty1.service
+
     # Disable and remove provider-created swap
     swapoff -a 2>/dev/null || true
     sed -i '/swap/d' /etc/fstab
