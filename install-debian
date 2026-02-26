@@ -188,14 +188,13 @@ _clean_system_files() {
         `# users          ` /home \
         `# motd/banners   ` /etc/{motd,update-motd.d/*} /run/motd.dynamic \
         `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,ssh/sshd_config.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,ldap,multipath,pollinate,xml,sgml} /usr/{share/dict/common.*,lib/firmware/regulatory.db{,.p7s},lib/python3/dist-packages/{dbus,gi,pygtkcompat}} /var/{lib/{dhcp,libuuid},crash} /media \
-        `# dpkg leftovers ` /etc/{dhcpcd.conf.dpkg-dist,default/grub.ucf-dist,ssh/sshd_config.ucf-dist,.resolv.conf.systemd-resolved.bak,apparmor.d,ldap,multipath,pollinate,xml,sgml} /usr/share/dict/common.* /usr/lib/firmware/regulatory.db{,.p7s} /usr/lib/python3/dist-packages/{dbus,gi,pygtkcompat} /var/lib/{dhcp,libuuid} /var/crash /media \
         `# pam            ` /etc/pam.d/*.pam-old \
         `# debconf        ` /var/cache/debconf/*.dat-old \
-        `# timesyncd      ` /etc/systemd/{timesyncd.conf,timesyncd.conf.d} /etc/systemd/system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service /etc/dhcp /var/lib/systemd/{deb-systemd-helper-enabled/*timesync*,deb-systemd-helper-enabled/*time-wait*,deb-systemd-helper-enabled/*/systemd-time*,timesync} /var/lib/dpkg/info/systemd-timesyncd.* \
+        `# timesyncd      ` /etc/{systemd/{timesyncd.conf,timesyncd.conf.d,system/{,*/}{systemd-timesyncd,dbus-org.freedesktop.timesync1}.service},dhcp} /var/lib/{systemd/{deb-systemd-helper-enabled/{*timesync*,*time-wait*,*/systemd-time*},timesync},dpkg/info/systemd-timesyncd.*} \
         `# stale timers   ` /var/lib/systemd/timers/stamp-*.timer \
         `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
         `# root           ` /root/{*,.[!.]*} \
-        `# logs and temp  ` /var/{log/*,tmp/*} /tmp/* \
+        `# logs and temp  ` /{var/{log/*,tmp/*},tmp/*} \
         `# swap           ` /swapfile
 
     # Ubuntu-specific cleanup
@@ -212,7 +211,7 @@ _clean_provider_files() {
         `# Oracle Cloud   ` /{opt,etc,usr/libexec}/oracle-cloud* /var/lib/oracle-cloud-agent \
         `# Rackspace      ` /usr/share/nova-agent /etc/rackspace-monitoring-agent \
         `# DigitalOcean   ` /opt/digitalocean /etc/do-agent /etc/systemd/system/{,*/}vpc-peering.service /etc/{ec2_version,overlayroot.local.conf} /etc/systemd/resolved.conf.d/DigitalOcean.conf \
-        `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} \
+        `# Linode         ` /{opt,etc}/linode /etc/{profile.d/lish.sh,network/.interfaces.linode-*,.resolv.conf.linode-*,kernel-img.conf,kernel/postinst.d/linode} /usr/lib/modules/grub-*-linode.img/ \
         `# Vultr          ` /{opt,etc,var/lib}/vultr /usr/lib/systemd/system/cloud-init-log-reader.service \
         `# Equinix Metal  ` /{opt,etc}/packet \
         `# OVHcloud       ` /{opt,etc}/ovh /usr/bin/{noderig,beamium} /opt/{noderig,beamium} /etc/beamium \
