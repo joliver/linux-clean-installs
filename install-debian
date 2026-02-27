@@ -50,7 +50,7 @@ _allowed_packages=(
     # Coreutils provider (Ubuntu 25.10+)
     coreutils-from-gnu
 )
-_purge_packages=( cloud-init lsb-base )
+_purge_packages=( cloud-init lsb-base gawk install-info 3cpio rust-coreutils )
 _reconfigure_packages=( openssh-server libpam-runtime apt bash ca-certificates )
 _reconfigure_files=( '/etc/apt/apt.conf.d/*' /etc/skel/.bashrc /etc/ssh/sshd_config )
 
@@ -93,7 +93,7 @@ _apt_upgrade() {
 }
 _apt_ensure_gnu_coreutils() {
     dpkg -l rust-coreutils 2>/dev/null | grep -q '^ii' || return 0
-    apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils-
+    apt-get install -y --allow-remove-essential coreutils-from-gnu coreutils-from-uutils- rust-coreutils-
 }
 _apt_upgrade_kernel() {
     # Select proper kernel metapackage: cloud/virtual for VMs, generic for bare metal
@@ -141,9 +141,14 @@ _apt_purge_packages() {
     apt-mark showmanual | xargs -r apt-mark auto > /dev/null 2>&1
     apt-mark manual "${_keep_packages[@]}" > /dev/null 2>&1
 
-    test ${#_purge_packages[@]} -gt 0 && apt-mark auto "${_purge_packages[@]}"
+    # Mark purge candidates as auto; ignore packages unknown to apt (e.g. 3cpio on older releases)
+    for _pkg in "${_purge_packages[@]}"; do apt-mark auto "${_pkg}" 2>/dev/null || true; done
     apt-get autoremove --purge -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false
-    test ${#_purge_packages[@]} -gt 0  && apt-get purge -y --allow-remove-essential --autoremove -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false "${_purge_packages[@]}"
+
+    # Explicitly purge but filter to use only packages known to dpkg which avoids errors on missing package names
+    _installed_to_purge=()
+    for _pkg in "${_purge_packages[@]}"; do dpkg -l "${_pkg}" 2>/dev/null | grep -q '^ii' && _installed_to_purge+=("${_pkg}"); done
+    test ${#_installed_to_purge[@]} -gt 0 && apt-get purge -y --allow-remove-essential --autoremove -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" -o APT::AutoRemove::RecommendsImportant=false -o APT::AutoRemove::SuggestsImportant=false "${_installed_to_purge[@]}"
 
     # Purge packages in 'rc' state (removed yet config lingers) so dpkg cleans up statoverrides
     dpkg -l | awk '/^rc/ {print $2}' | xargs -r dpkg --purge
