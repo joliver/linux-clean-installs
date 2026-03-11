@@ -215,7 +215,8 @@ _clean_system_files() {
         `# backups        ` /var/backups/* /var/lib/ucf/{hashfile.*,registry.*} \
         `# root           ` /root/{*,.[!.]*} \
         `# logs and temp  ` /{var/{log/*,tmp/*},tmp/*} \
-        `# swap           ` /swapfile
+        `# swap           ` /swapfile \
+        `# docs/locales   ` /usr/share/{doc/*,man/*,info/*,locale/*}
 
     # Ubuntu-specific cleanup
     rm -rf \
