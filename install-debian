@@ -46,13 +46,14 @@ _allowed_packages=(
     grub-pc grub-efi-amd64 grub-efi-arm64 grub-efi-ia32 grub-ieee1275
     grub-efi-amd64-signed grub-efi-arm64-signed initramfs-tools
     # Networking & DHCP (provider-dependent)
-    dhcpcd-base dhcpcd5 ifupdown netplan.io systemd-resolved
+    dhcpcd-base dhcpcd5 ifupdown systemd-resolved
     # Coreutils provider (Ubuntu 25.10+)
     coreutils-from-gnu
 )
 _purge_packages=( cloud-init lsb-base gawk install-info 3cpio rust-coreutils )
 _reconfigure_packages=( openssh-server libpam-runtime apt bash ca-certificates )
 _reconfigure_files=( '/etc/apt/apt.conf.d/*' /etc/skel/.bashrc /etc/ssh/sshd_config )
+test "${ID}" = "ubuntu" && _allowed_packages+=(netplan.io) || _purge_packages+=(netplan.io)
 
 _dpkg_excludes() {
     mkdir -p /etc/dpkg/dpkg.cfg.d/
